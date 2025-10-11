@@ -1,6 +1,10 @@
 # Logbook System
 
+<<<<<<< HEAD
 A React + TypeScript logbook management system for students and supervisors built with Tailwind CSS.
+=======
+A React-based logbook management system for students and supervisors built with Tailwind CSS.
+>>>>>>> 7b8e512 (feat: migrate to Tailwind CSS and update UI styling with gradients)
 
 ## Features
 
@@ -9,6 +13,7 @@ A React + TypeScript logbook management system for students and supervisors buil
 - **Supervisor Selection**: Browse and select supervisors
 - **Supervisor Dashboard**: Review and supervise student entries
 - **New Student Entry**: View student's logbook entries by week
+<<<<<<< HEAD
 
 ## Project Structure
 
@@ -23,6 +28,8 @@ src/
 ├── index.tsx         # Entry point
 └── index.css         # Global styles with Tailwind
 ```
+=======
+>>>>>>> 7b8e512 (feat: migrate to Tailwind CSS and update UI styling with gradients)
 
 ## Installation
 
@@ -60,9 +67,14 @@ The application will open at `http://localhost:3000`
 - TypeScript 5
 - React Router DOM 6
 - Tailwind CSS 3
+<<<<<<< HEAD
 - Lucide React
 - PostCSS & Autoprefixer
 
 ## Type Safety
 
 The project uses TypeScript with strict mode enabled for better type safety and developer experience. All components are fully typed with proper interfaces and type definitions.
+=======
+- Lucide React (icons)
+- PostCSS & Autoprefixer
+>>>>>>> 7b8e512 (feat: migrate to Tailwind CSS and update UI styling with gradients)
