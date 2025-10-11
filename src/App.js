@@ -5,7 +5,6 @@ import StudentDashboard from './pages/StudentDashboard';
 import SupervisorSelection from './pages/SupervisorSelection';
 import SupervisorDashboard from './pages/SupervisorDashboard';
 import NewStudentEntry from './pages/NewStudentEntry';
-import './App.css';
 
 function App() {
   return (
