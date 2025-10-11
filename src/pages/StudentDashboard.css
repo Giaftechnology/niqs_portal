@@ -1,0 +1,211 @@
+.student-dashboard {
+  min-height: 100vh;
+  background-color: #f5f5f7;
+}
+
+.dashboard-header {
+  background-color: white;
+  padding: 16px 32px;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  border-bottom: 1px solid #e5e7eb;
+}
+
+.header-left {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.logo-container {
+  width: 40px;
+  height: 40px;
+  background-color: #6366f1;
+  border-radius: 8px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.header-title {
+  font-size: 20px;
+  font-weight: 600;
+  color: #1f2937;
+  margin: 0;
+}
+
+.header-subtitle {
+  font-size: 12px;
+  color: #6b7280;
+  margin: 0;
+}
+
+.sign-out-btn {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 16px;
+  background-color: white;
+  border: 1px solid #e5e7eb;
+  border-radius: 6px;
+  font-size: 14px;
+  color: #1f2937;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.sign-out-btn:hover {
+  background-color: #f9fafb;
+  border-color: #d1d5db;
+}
+
+.dashboard-content {
+  display: flex;
+  gap: 24px;
+  padding: 32px;
+  max-width: 1400px;
+  margin: 0 auto;
+}
+
+.sidebar {
+  width: 320px;
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.card {
+  background: white;
+  border-radius: 12px;
+  padding: 24px;
+  border: 1px solid #e5e7eb;
+}
+
+.card-header {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 16px;
+}
+
+.card-header h3 {
+  font-size: 14px;
+  font-weight: 600;
+  color: #1f2937;
+  margin: 0;
+}
+
+.level-card {
+  background: linear-gradient(135deg, #f0f0ff 0%, #faf5ff 100%);
+  border: 1px solid #e9d5ff;
+}
+
+.level-title {
+  font-size: 36px;
+  font-weight: 700;
+  color: #6366f1;
+  margin: 8px 0 0 0;
+}
+
+.progress-card {
+}
+
+.progress-item {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding-bottom: 16px;
+  margin-bottom: 16px;
+  border-bottom: 1px solid #e5e7eb;
+}
+
+.progress-label {
+  font-size: 14px;
+  color: #6b7280;
+}
+
+.progress-value {
+  font-size: 14px;
+  font-weight: 600;
+  color: #1f2937;
+}
+
+.total-entries {
+  background-color: #f9fafb;
+  padding: 16px;
+  border-radius: 8px;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.entries-label {
+  font-size: 12px;
+  color: #6b7280;
+}
+
+.entries-value {
+  font-size: 24px;
+  font-weight: 700;
+  color: #1f2937;
+}
+
+.supervision-card {
+}
+
+.supervision-title {
+  font-size: 16px;
+  font-weight: 600;
+  color: #1f2937;
+  margin: 0 0 12px 0;
+}
+
+.supervision-message {
+  font-size: 14px;
+  color: #dc2626;
+  margin-bottom: 16px;
+}
+
+.select-supervisor-btn {
+  width: 100%;
+  padding: 10px;
+  background-color: white;
+  border: 1px solid #e5e7eb;
+  border-radius: 6px;
+  font-size: 14px;
+  color: #1f2937;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.select-supervisor-btn:hover {
+  background-color: #f9fafb;
+  border-color: #d1d5db;
+}
+
+.main-content {
+  flex: 1;
+}
+
+.logbook-access-card {
+  background: white;
+  border-radius: 12px;
+  padding: 48px;
+  border: 1px solid #e5e7eb;
+  text-align: center;
+}
+
+.access-title {
+  font-size: 24px;
+  font-weight: 600;
+  color: #1f2937;
+  margin: 0 0 16px 0;
+}
+
+.access-message {
+  font-size: 15px;
+  color: #6b7280;
+  margin: 0;
+  line-height: 1.6;
+}

@@ -15,19 +15,13 @@ A React + TypeScript logbook management system for students and supervisors buil
 ```
 src/
 ├── components/       # Reusable UI components
-├── pages/           # Page components (each in own folder)
-│   ├── Login/
-│   ├── StudentDashboard/
-│   ├── SupervisorSelection/
-│   ├── SupervisorDashboard/
-│   └── NewStudentEntry/
-├── types/           # TypeScript type definitions
-│   └── index.ts
-├── hooks/           # Custom React hooks
-├── utils/           # Utility functions
-├── App.tsx          # Main app component
-├── index.tsx        # Entry point
-└── index.css        # Global styles with Tailwind
+├── pages/            # Page components
+├── types/            # TypeScript type definitions
+├── hooks/            # Custom React hooks
+├── utils/            # Utility functions
+├── App.tsx           # Main app component
+├── index.tsx         # Entry point
+└── index.css         # Global styles with Tailwind
 ```
 
 ## Installation
@@ -62,12 +56,12 @@ The application will open at `http://localhost:3000`
 
 ## Technologies Used
 
-- **React 18** - UI library
-- **TypeScript 5** - Type safety
-- **React Router DOM 6** - Routing
-- **Tailwind CSS 3** - Styling
-- **Lucide React** - Icons
-- **PostCSS & Autoprefixer** - CSS processing
+- React 18
+- TypeScript 5
+- React Router DOM 6
+- Tailwind CSS 3
+- Lucide React
+- PostCSS & Autoprefixer
 
 ## Type Safety
 
