@@ -1,13 +1,17 @@
-import React, { useState } from 'react';
+import React, { useState, ChangeEvent } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Search, User } from 'lucide-react';
 
-function SupervisorSelection() {
+const SupervisorSelection: React.FC = () => {
   const navigate = useNavigate();
-  const [searchQuery, setSearchQuery] = useState('ff5a1bcf-a12f-4901-a2ee-376dab7d20e5');
+  const [searchQuery, setSearchQuery] = useState<string>('ff5a1bcf-a12f-4901-a2ee-376dab7d20e5');
 
-  const handleSelect = () => {
+  const handleSelect = (): void => {
     navigate('/supervisor-dashboard');
+  };
+
+  const handleSearchChange = (e: ChangeEvent<HTMLInputElement>): void => {
+    setSearchQuery(e.target.value);
   };
 
   return (
@@ -25,7 +29,7 @@ function SupervisorSelection() {
             className="w-full pl-12 pr-4 py-3.5 border-2 border-indigo-500 rounded-lg text-sm bg-white focus:outline-none focus:border-indigo-600 transition-all"
             placeholder="Search supervisors..."
             value={searchQuery}
-            onChange={(e) => setSearchQuery(e.target.value)}
+            onChange={handleSearchChange}
           />
         </div>
 
@@ -54,6 +58,6 @@ function SupervisorSelection() {
       </div>
     </div>
   );
-}
+};
 
 export default SupervisorSelection;

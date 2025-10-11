@@ -6,7 +6,7 @@ import SupervisorSelection from './pages/SupervisorSelection';
 import SupervisorDashboard from './pages/SupervisorDashboard';
 import NewStudentEntry from './pages/NewStudentEntry';
 
-function App() {
+const App: React.FC = () => {
   return (
     <Router>
       <Routes>
@@ -19,6 +19,6 @@ function App() {
       </Routes>
     </Router>
   );
-}
+};
 
 export default App;

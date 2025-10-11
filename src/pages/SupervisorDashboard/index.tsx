@@ -1,16 +1,17 @@
 import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { LogOut, Eye } from 'lucide-react';
+import { TabType } from '../../types';
 
-function SupervisorDashboard() {
+const SupervisorDashboard: React.FC = () => {
   const navigate = useNavigate();
-  const [activeTab, setActiveTab] = useState('supervise');
+  const [activeTab, setActiveTab] = useState<TabType>('supervise');
 
-  const handleLogout = () => {
+  const handleLogout = (): void => {
     navigate('/login');
   };
 
-  const handleViewLogbook = () => {
+  const handleViewLogbook = (): void => {
     navigate('/new-student-entry');
   };
 
@@ -78,6 +79,6 @@ function SupervisorDashboard() {
       </div>
     </div>
   );
-}
+};
 
 export default SupervisorDashboard;

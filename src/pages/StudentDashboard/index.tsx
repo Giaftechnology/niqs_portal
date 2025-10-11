@@ -2,14 +2,14 @@ import React from 'react';
 import { useNavigate } from 'react-router-dom';
 import { BookOpen, LogOut, TrendingUp } from 'lucide-react';
 
-function StudentDashboard() {
+const StudentDashboard: React.FC = () => {
   const navigate = useNavigate();
 
-  const handleSignOut = () => {
+  const handleSignOut = (): void => {
     navigate('/login');
   };
 
-  const handleSelectSupervisor = () => {
+  const handleSelectSupervisor = (): void => {
     navigate('/supervisor-selection');
   };
 
@@ -82,6 +82,6 @@ function StudentDashboard() {
       </div>
     </div>
   );
-}
+};
 
 export default StudentDashboard;

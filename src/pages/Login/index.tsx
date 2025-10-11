@@ -1,12 +1,12 @@
-import React, { useState } from 'react';
+import React, { useState, FormEvent } from 'react';
 import { useNavigate } from 'react-router-dom';
 
-function Login() {
+const Login: React.FC = () => {
   const navigate = useNavigate();
-  const [email, setEmail] = useState('');
-  const [password, setPassword] = useState('');
+  const [email, setEmail] = useState<string>('');
+  const [password, setPassword] = useState<string>('');
 
-  const handleSignIn = (e) => {
+  const handleSignIn = (e: FormEvent<HTMLFormElement>): void => {
     e.preventDefault();
     navigate('/student-dashboard');
   };
@@ -64,6 +64,6 @@ function Login() {
       </div>
     </div>
   );
-}
+};
 
 export default Login;

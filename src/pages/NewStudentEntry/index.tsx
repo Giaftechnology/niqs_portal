@@ -2,10 +2,10 @@ import React from 'react';
 import { useNavigate } from 'react-router-dom';
 import { ArrowLeft } from 'lucide-react';
 
-function NewStudentEntry() {
+const NewStudentEntry: React.FC = () => {
   const navigate = useNavigate();
 
-  const handleBackToDashboard = () => {
+  const handleBackToDashboard = (): void => {
     navigate('/supervisor-dashboard');
   };
 
@@ -31,6 +31,6 @@ function NewStudentEntry() {
       </div>
     </div>
   );
-}
+};
 
 export default NewStudentEntry;
