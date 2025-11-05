@@ -1,21 +1,25 @@
 import React, { useState, FormEvent } from 'react';
 import { useNavigate } from 'react-router-dom';
+import { useAuth } from '../../context/AuthContext';
 
 const Login: React.FC = () => {
   const navigate = useNavigate();
+  const { signIn } = useAuth();
   const [email, setEmail] = useState<string>('');
   const [password, setPassword] = useState<string>('');
 
-  const handleSignIn = (e: FormEvent<HTMLFormElement>): void => {
+  const handleSignIn = async (e: FormEvent<HTMLFormElement>) => {
     e.preventDefault();
-    navigate('/student-dashboard');
+    const signedIn = await signIn(email, password);
+    const next = signedIn.onboardingComplete ? '/app' : '/profile';
+    navigate(next);
   };
 
   return (
     <div className="min-h-screen flex items-center justify-center bg-gray-100">
-      <div className="bg-white p-12 rounded-xl shadow-md w-full max-w-md">
+      <div className="bg-white p-16 rounded-2xl shadow-md w-full max-w-xl">
         <h1 className="text-3xl font-semibold text-center mb-2 bg-gradient-to-r from-indigo-500 to-purple-500 bg-clip-text text-transparent">
-          Logbook System
+          NIQS Portal
         </h1>
         <p className="text-sm text-gray-500 text-center mb-8">Sign in to your account</p>
         
@@ -57,9 +61,18 @@ const Login: React.FC = () => {
             Sign In
           </button>
         </form>
+        <div className="mt-4 text-center text-sm">
+          <button
+            type="button"
+            onClick={() => navigate('/forgot-password')}
+            className="text-indigo-600 hover:underline"
+          >
+            Forgot password?
+          </button>
+        </div>
 
         <p className="text-center text-sm text-gray-500 mt-6">
-          Don't have an account? <span className="text-indigo-500 font-medium cursor-pointer hover:underline">Sign up</span>
+          Don't have an account? <span className="text-indigo-500 font-medium cursor-pointer hover:underline" onClick={() => navigate('/signup')}>Sign up</span>
         </p>
       </div>
     </div>
