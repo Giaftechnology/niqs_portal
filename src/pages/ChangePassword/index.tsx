@@ -1,6 +1,7 @@
 import React, { FormEvent, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { RequireAuth, useAuth } from '../../context/AuthContext';
+import Modal from '../../components/Modal';
 
 const ChangePasswordForm: React.FC = () => {
   const navigate = useNavigate();
@@ -8,20 +9,20 @@ const ChangePasswordForm: React.FC = () => {
   const [currentPassword, setCurrentPassword] = useState('');
   const [newPassword, setNewPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
+  const [modal, setModal] = useState<{ open: boolean; title: string; message?: string; onConfirm?: () => void }>({ open: false, title: '' });
 
   const handleSubmit = (e: FormEvent<HTMLFormElement>) => {
     e.preventDefault();
     if (newPassword.length < 8) {
-      alert('New password must be at least 8 characters.');
+      setModal({ open: true, title: 'Weak Password', message: 'New password must be at least 8 characters.' });
       return;
     }
     if (newPassword !== confirmPassword) {
-      alert('Passwords do not match.');
+      setModal({ open: true, title: 'Mismatch', message: 'Passwords do not match.' });
       return;
     }
     // Mock password change. Real implementation will call backend API.
-    alert(`Password updated for ${user?.email}.`);
-    navigate(-1);
+    setModal({ open: true, title: 'Password Updated', message: `Password updated for ${user?.email}.`, onConfirm: () => navigate(-1) });
   };
 
   return (
@@ -73,6 +74,14 @@ const ChangePasswordForm: React.FC = () => {
             Update Password
           </button>
         </form>
+        <Modal
+          open={modal.open}
+          title={modal.title}
+          onClose={() => setModal({ open: false, title: '' })}
+          onConfirm={modal.onConfirm}
+        >
+          {modal.message}
+        </Modal>
       </div>
     </div>
   );
@@ -85,3 +94,4 @@ const ChangePassword: React.FC = () => (
 );
 
 export default ChangePassword;
+

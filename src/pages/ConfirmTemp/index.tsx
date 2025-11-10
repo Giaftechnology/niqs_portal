@@ -1,12 +1,14 @@
 import React, { FormEvent, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { RequireAuth, useAuth } from '../../context/AuthContext';
+import Modal from '../../components/Modal';
 
 const ConfirmTempForm: React.FC = () => {
   const navigate = useNavigate();
   const { user, verifyTempPassword, resendTempPassword } = useAuth();
   const [temp, setTemp] = useState('');
   const [loading, setLoading] = useState(false);
+  const [modal, setModal] = useState<{ open: boolean; title: string; message?: string; onConfirm?: () => void }>({ open: false, title: '' });
 
   const handleSubmit = async (e: FormEvent<HTMLFormElement>) => {
     e.preventDefault();
@@ -14,17 +16,15 @@ const ConfirmTempForm: React.FC = () => {
     const ok = await verifyTempPassword(temp);
     setLoading(false);
     if (ok) {
-      alert('Temporary password confirmed. You can now continue.');
-      // Next step is profile completion
-      navigate('/profile');
+      setModal({ open: true, title: 'Confirmed', message: 'Temporary password confirmed. You can now continue.', onConfirm: () => navigate('/onboarding') });
     } else {
-      alert('Invalid temporary password. Please check your email and try again.');
+      setModal({ open: true, title: 'Invalid Password', message: 'Invalid temporary password. Please check your email and try again.' });
     }
   };
 
   const handleResend = async () => {
     const next = await resendTempPassword();
-    if (next) alert(`A new temporary password has been sent to ${user?.email}.\n\nTemporary password: ${next}`);
+    if (next) setModal({ open: true, title: 'Temporary Password Resent', message: `A new temporary password has been sent to ${user?.email}.\n\nTemporary password: ${next}` });
   };
 
   return (
@@ -66,6 +66,14 @@ const ConfirmTempForm: React.FC = () => {
           </button>
         </div>
       </div>
+      <Modal
+        open={modal.open}
+        title={modal.title}
+        onClose={() => setModal({ open: false, title: '' })}
+        onConfirm={modal.onConfirm}
+      >
+        {modal.message}
+      </Modal>
     </div>
   );
 };

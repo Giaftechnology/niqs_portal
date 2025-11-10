@@ -1,14 +1,16 @@
 import React, { FormEvent, useState } from 'react';
+import Modal from '../../components/Modal';
 
 const ForgotPassword: React.FC = () => {
   const [email, setEmail] = useState('');
   const [sent, setSent] = useState(false);
+  const [modal, setModal] = useState<{ open: boolean; title: string; message?: string }>({ open: false, title: '' });
 
   const handleSubmit = (e: FormEvent<HTMLFormElement>) => {
     e.preventDefault();
     // Mock: trigger password reset flow (backend would send reset email)
     setSent(true);
-    alert(`If an account exists for ${email}, a reset link has been sent.`);
+    setModal({ open: true, title: 'Reset Instructions Sent', message: `If an account exists for ${email}, a reset link has been sent.` });
   };
 
   return (
@@ -40,6 +42,9 @@ const ForgotPassword: React.FC = () => {
             {sent ? 'Resend Instructions' : 'Send Reset Instructions'}
           </button>
         </form>
+        <Modal open={modal.open} title={modal.title} onClose={() => setModal({ open: false, title: '' })}>
+          {modal.message}
+        </Modal>
       </div>
     </div>
   );

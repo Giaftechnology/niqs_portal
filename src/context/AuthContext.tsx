@@ -1,6 +1,6 @@
 import React, { createContext, useCallback, useContext, useEffect, useMemo, useState } from 'react';
 
-export type UserRole = 'probational' | 'graduate' | 'admin';
+export type UserRole = 'probational' | 'graduate' | 'student' | 'admin';
 
 export type User = {
   email: string;
@@ -19,6 +19,7 @@ export type AuthContextType = {
   loading: boolean;
   signIn: (email: string, password: string) => Promise<User>;
   signUp: (email: string, password: string, role: Exclude<UserRole, 'admin'>) => Promise<User>;
+  signInAsAdmin?: (email: string, password: string) => Promise<User>;
   signOut: () => void;
   completeOnboarding: (profile: NonNullable<User['profile']>) => Promise<User | null>;
   verifyTempPassword: (password: string) => Promise<boolean>;
@@ -99,7 +100,11 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   }, [user]);
 
   const value = useMemo(
-    () => ({ user, loading, signIn, signUp, signOut, completeOnboarding, verifyTempPassword, resendTempPassword }),
+    () => ({ user, loading, signIn, signUp, signOut, completeOnboarding, verifyTempPassword, resendTempPassword, signInAsAdmin: async (email: string, _password: string) => {
+      const admin: User = { email, role: 'admin', onboardingComplete: true };
+      setUser(admin);
+      return admin;
+    }}),
     [user, loading, signIn, signUp, signOut, completeOnboarding, verifyTempPassword, resendTempPassword]
   );
 
@@ -116,5 +121,14 @@ export const RequireAuth: React.FC<{ children: React.ReactNode }> = ({ children 
   const { user, loading } = useAuth();
   if (loading) return null;
   if (!user) return <div className="min-h-screen flex items-center justify-center">Please log in.</div>;
+  return <>{children}</>;
+};
+
+export const RequireAdmin: React.FC<{ children: React.ReactNode }> = ({ children }) => {
+  const { user, loading } = useAuth();
+  if (loading) return null;
+  if (!user || user.role !== 'admin') {
+    return <a href="/admin/login" className="block min-h-screen flex items-center justify-center">Redirecting…</a>;
+  }
   return <>{children}</>;
 };

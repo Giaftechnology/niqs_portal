@@ -1,12 +1,14 @@
 import React, { FormEvent, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth, UserRole } from '../../context/AuthContext';
+import Modal from '../../components/Modal';
 
 const Signup: React.FC = () => {
   const navigate = useNavigate();
   const { signUp } = useAuth();
   const [email, setEmail] = useState('');
   const [role, setRole] = useState<Exclude<UserRole, 'admin'>>('probational');
+  const [modal, setModal] = useState<{ open: boolean; title: string; message?: string; onConfirm?: () => void }>({ open: false, title: '' });
 
   const generatePassword = (length = 12) => {
     const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789!@#$%^&*()_+';
@@ -22,8 +24,12 @@ const Signup: React.FC = () => {
     const tempPassword = generatePassword(12);
     await signUp(email, tempPassword, role);
     // Mock "send password to email" and show for development convenience
-    alert(`A temporary password has been sent to ${email}.\n\nTemporary password: ${tempPassword}\n\nYou can change it later in your profile settings.`);
-    navigate('/confirm-temp');
+    setModal({
+      open: true,
+      title: 'Temporary Password Sent',
+      message: `A temporary password has been sent to ${email}.\n\nTemporary password: ${tempPassword}\n\nYou can change it later in your profile settings.`,
+      onConfirm: () => navigate('/confirm-temp'),
+    });
   };
 
   return (
@@ -49,7 +55,7 @@ const Signup: React.FC = () => {
 
           <div>
             <span className="block text-sm font-medium text-gray-800 mb-2">Register as</span>
-            <div className="grid grid-cols-2 gap-3">
+            <div className="grid grid-cols-3 gap-3">
               <button
                 type="button"
                 onClick={() => setRole('probational')}
@@ -63,6 +69,13 @@ const Signup: React.FC = () => {
                 className={`px-4 py-3 rounded-lg border text-sm ${role === 'graduate' ? 'border-indigo-500 bg-indigo-50 text-indigo-700' : 'border-gray-200 bg-white text-gray-800'}`}
               >
                 Graduate
+              </button>
+              <button
+                type="button"
+                onClick={() => setRole('student')}
+                className={`px-4 py-3 rounded-lg border text-sm ${role === 'student' ? 'border-indigo-500 bg-indigo-50 text-indigo-700' : 'border-gray-200 bg-white text-gray-800'}`}
+              >
+                Student
               </button>
             </div>
           </div>
@@ -78,6 +91,9 @@ const Signup: React.FC = () => {
         <p className="text-center text-sm text-gray-500 mt-6">
           Already have an account? <span className="text-indigo-500 font-medium cursor-pointer hover:underline" onClick={() => navigate('/login')}>Sign in</span>
         </p>
+        <Modal open={modal.open} title={modal.title} onClose={() => setModal({ open: false, title: '' })} onConfirm={modal.onConfirm}>
+          {modal.message}
+        </Modal>
       </div>
     </div>
   );

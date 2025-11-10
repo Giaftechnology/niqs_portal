@@ -1,13 +1,21 @@
 import React, { useState, ChangeEvent } from 'react';
 import { useNavigate } from 'react-router-dom';
+import { useAuth } from '../../context/AuthContext';
 import { Search, User } from 'lucide-react';
 
 const SupervisorSelection: React.FC = () => {
   const navigate = useNavigate();
-  const [searchQuery, setSearchQuery] = useState<string>('ff5a1bcf-a12f-4901-a2ee-376dab7d20e5');
+  const { user } = useAuth();
+  const [searchQuery, setSearchQuery] = useState<string>('');
 
   const handleSelect = (): void => {
-    navigate('/supervisor-dashboard');
+    if (!user) return;
+    const statusKey = `student_supervision_status_${user.email}`;
+    const nameKey = `student_supervisor_name_${user.email}`;
+    localStorage.setItem(statusKey, 'pending');
+    localStorage.setItem(nameKey, 'b');
+    localStorage.setItem('student_request_email', user.email);
+    navigate('/app/student-logbook');
   };
 
   const handleSearchChange = (e: ChangeEvent<HTMLInputElement>): void => {
@@ -33,6 +41,50 @@ const SupervisorSelection: React.FC = () => {
           />
         </div>
 
+        <div className="bg-white rounded-xl border border-gray-200 overflow-hidden">
+          <div className="p-5 flex justify-between items-center border-b border-gray-200">
+            <div className="flex items-center gap-4">
+              <div className="w-12 h-12 rounded-full bg-gray-100 border-2 border-gray-200 flex items-center justify-center">
+                <User size={24} color="#6b7280" />
+              </div>
+              <div>
+                <h3 className="text-base font-semibold text-gray-800">b</h3>
+                <p className="text-xs text-gray-500 font-mono">ff5a1bcf-a12f-4901-a2ee-376dab7d20e5</p>
+              </div>
+            </div>
+            <div className="flex items-center gap-4">
+              <span className="text-sm text-gray-500 font-medium">Level 1</span>
+              <button 
+                onClick={handleSelect}
+                className="px-6 py-2 bg-indigo-500 text-white rounded-md text-sm font-medium hover:bg-indigo-600 transition-all"
+              >
+                Select
+              </button>
+            </div>
+          </div>
+        </div>
+        <div className="bg-white rounded-xl border border-gray-200 overflow-hidden">
+          <div className="p-5 flex justify-between items-center border-b border-gray-200">
+            <div className="flex items-center gap-4">
+              <div className="w-12 h-12 rounded-full bg-gray-100 border-2 border-gray-200 flex items-center justify-center">
+                <User size={24} color="#6b7280" />
+              </div>
+              <div>
+                <h3 className="text-base font-semibold text-gray-800">b</h3>
+                <p className="text-xs text-gray-500 font-mono">ff5a1bcf-a12f-4901-a2ee-376dab7d20e5</p>
+              </div>
+            </div>
+            <div className="flex items-center gap-4">
+              <span className="text-sm text-gray-500 font-medium">Level 1</span>
+              <button 
+                onClick={handleSelect}
+                className="px-6 py-2 bg-indigo-500 text-white rounded-md text-sm font-medium hover:bg-indigo-600 transition-all"
+              >
+                Select
+              </button>
+            </div>
+          </div>
+        </div>
         <div className="bg-white rounded-xl border border-gray-200 overflow-hidden">
           <div className="p-5 flex justify-between items-center border-b border-gray-200">
             <div className="flex items-center gap-4">
