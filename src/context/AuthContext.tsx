@@ -132,3 +132,16 @@ export const RequireAdmin: React.FC<{ children: React.ReactNode }> = ({ children
   }
   return <>{children}</>;
 };
+
+export const RequireProfile: React.FC<{ children: React.ReactNode }> = ({ children }) => {
+  const { user, loading } = useAuth();
+  if (loading) return null;
+  if (!user) return <>{children}</>; // handled by other guards
+  // Allow onboarding route itself
+  const isOnboarding = typeof window !== 'undefined' && window.location.pathname.startsWith('/onboarding');
+  if (!user.onboardingComplete && !isOnboarding) {
+    window.location.href = '/onboarding';
+    return null;
+  }
+  return <>{children}</>;
+};

@@ -1,12 +1,39 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { Link, NavLink, Outlet, useLocation, useNavigate } from 'react-router-dom';
-import { LayoutGrid, Users2, GraduationCap, ClipboardList, Briefcase, Banknote, Database, UserCircle2, LogOut, BookOpen, Gavel, ChevronRight } from 'lucide-react';
+import { LayoutGrid, Users2, GraduationCap, ClipboardList, Briefcase, Banknote, UserCircle2, LogOut, BookOpen, Gavel, ChevronRight } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 
 const navItemClass = ({ isActive }: { isActive: boolean }) =>
   `flex items-center gap-3 px-3 py-2 rounded-lg text-sm transition-colors ${
     isActive ? 'bg-indigo-50 text-indigo-700' : 'text-gray-700 hover:bg-gray-50'
   }`;
+
+const LogbookGroup: React.FC = () => {
+  const [open, setOpen] = useState(false);
+  return (
+    <div className="space-y-1">
+      <button onClick={()=>setOpen(v=>!v)} className="w-full flex items-center justify-between px-3 py-2 rounded-lg text-sm text-gray-700 hover:bg-gray-50">
+        <span className="flex items-center gap-3">
+          <BookOpen size={18} /> Logbook
+        </span>
+        <ChevronRight size={16} className={`transition-transform ${open ? 'rotate-90' : ''}`} />
+      </button>
+      {open && (
+        <div className="pl-8 space-y-1">
+          <NavLink to="/app/student-logbook" className={navItemClass as any}>
+            <GraduationCap size={18} /> Logbook
+          </NavLink>
+          <NavLink to="/app/supervisor-logbook" className={navItemClass as any}>
+            <ClipboardList size={18} /> Supervised Logbook
+          </NavLink>
+          <NavLink to="/app/accessor-logbook" className={navItemClass as any}>
+            <Briefcase size={18} /> Accessed Logbook
+          </NavLink>
+        </div>
+      )}
+    </div>
+  );
+};
 
 const DashboardLayout: React.FC = () => {
   const { signOut, user } = useAuth();
@@ -109,18 +136,8 @@ const DashboardLayout: React.FC = () => {
                 </NavLink>
               </>
             )}
-            <NavLink to="/app/student-logbook" className={navItemClass as any}>
-              <GraduationCap size={18} /> Student Logbook
-            </NavLink>
-            <NavLink to="/app/supervisor-logbook" className={navItemClass as any}>
-              <ClipboardList size={18} /> Supervisor Logbook
-            </NavLink>
-            <NavLink to="/app/accessor-logbook" className={navItemClass as any}>
-              <Briefcase size={18} /> Accessor Logbook
-            </NavLink>
-            <NavLink to="/app/databank" className={navItemClass as any}>
-              <Database size={18} /> Databank
-            </NavLink>
+            {/* Logbook group */}
+            <LogbookGroup />
           </nav>
         </aside>
         <main className="flex-1 p-6">

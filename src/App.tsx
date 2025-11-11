@@ -6,7 +6,7 @@ import SupervisorDashboard from './pages/SupervisorDashboard';
 import NewStudentEntry from './pages/NewStudentEntry';
 import Signup from './pages/Signup';
 import Profile from './pages/Profile';
-import { AuthProvider, RequireAuth } from './context/AuthContext';
+import { AuthProvider, RequireAuth, RequireProfile } from './context/AuthContext';
 import ChangePassword from './pages/ChangePassword';
 import ConfirmTemp from './pages/ConfirmTemp';
 import ForgotPassword from './pages/ForgotPassword';
@@ -24,6 +24,7 @@ import AdminLayout from './layouts/AdminLayout';
 import AdminLogin from './pages/admin/AdminLogin';
 import AdminDashboard from './pages/admin/AdminDashboard';
 import AdminUsers from './pages/admin/Users';
+import StaffDetail from './pages/admin/StaffDetail';
 import AdminSupervisors from './pages/admin/Supervisors';
 import AdminLogs from './pages/admin/Logs';
 import AdminRoles from './pages/admin/Roles';
@@ -41,10 +42,19 @@ import AdminAccessors from './pages/admin/Accessors';
 import AdminStudents from './pages/admin/Students';
 import AdminSubmissions from './pages/admin/Submissions';
 import AdminDietManagement from './pages/admin/DietManagement';
+import AdminDietDetail from './pages/admin/DietDetail';
 import AdminVendors from './pages/admin/Vendors';
 import AdminRequisitions from './pages/admin/Requisitions';
 import SupervisorAssignments from './pages/admin/SupervisorAssignments';
 import PurchaseOrders from './pages/admin/PurchaseOrders';
+import AdminProfile from './pages/admin/Profile';
+import MembershipDashboard from './pages/admin/membership/Dashboard';
+import MembershipProbationals from './pages/admin/membership/Probationals';
+import MembershipGraduates from './pages/admin/membership/Graduates';
+import MembershipStudents from './pages/admin/membership/Students';
+import MembershipMaturedRoutes from './pages/admin/membership/MaturedRoutes';
+import MembershipApplications from './pages/admin/membership/Applications';
+import MembershipMembers from './pages/admin/membership/Members';
 
 const App: React.FC = () => {
   return (
@@ -61,6 +71,8 @@ const App: React.FC = () => {
           <Route path="/admin" element={<RequireAdmin><AdminLayout /></RequireAdmin>}>
             <Route index element={<AdminDashboard />} />
             <Route path="users" element={<AdminUsers />} />
+            <Route path="users/:id" element={<StaffDetail />} />
+            <Route path="profile" element={<AdminProfile />} />
             <Route path="supervisors" element={<AdminSupervisors />} />
             <Route path="logs" element={<AdminLogs />} />
             {/* Access Control (new) */}
@@ -79,34 +91,40 @@ const App: React.FC = () => {
             <Route path="procurements/vendors" element={<AdminVendors />} />
             <Route path="procurements/purchase-orders" element={<PurchaseOrders />} />
             <Route path="procurements/requisitions" element={<AdminRequisitions />} />
+            {/* Membership group */}
+            <Route path="membership" element={<MembershipDashboard />} />
+            <Route path="membership/probationals" element={<MembershipProbationals />} />
+            <Route path="membership/graduates" element={<MembershipGraduates />} />
+            <Route path="membership/students" element={<MembershipStudents />} />
+            <Route path="membership/matured-routes" element={<MembershipMaturedRoutes />} />
+            <Route path="membership/applications" element={<MembershipApplications />} />
+            <Route path="membership/members" element={<MembershipMembers />} />
             {/* Logbook group */}
             <Route path="logbook/supervisors" element={<AdminSupervisors />} />
-            <Route path="logbook/supervisor-assignments" element={<SupervisorAssignments />} />
             <Route path="logbook/accessors" element={<AdminAccessors />} />
-            <Route path="logbook/students" element={<AdminStudents />} />
-            <Route path="logbook/submissions" element={<AdminSubmissions />} />
             <Route path="logbook/diet-management" element={<AdminDietManagement />} />
+            <Route path="logbook/diet-management/:id" element={<AdminDietDetail />} />
             <Route path="settings" element={<AdminSettings />} />
             <Route path="databank" element={<AdminDashboard />} />
           </Route>
-          <Route path="/profile" element={<RequireAuth><Profile /></RequireAuth>} />
-          <Route path="/change-password" element={<RequireAuth><ChangePassword /></RequireAuth>} />
-          <Route path="/app" element={<RequireAuth><DashboardLayout /></RequireAuth>}>
+          <Route path="/profile" element={<RequireAuth><RequireProfile><Profile /></RequireProfile></RequireAuth>} />
+          <Route path="/change-password" element={<RequireAuth><RequireProfile><ChangePassword /></RequireProfile></RequireAuth>} />
+          <Route path="/app" element={<RequireAuth><RequireProfile><DashboardLayout /></RequireProfile></RequireAuth>}>
             <Route index element={<Dashboard />} />
             <Route path="admin" element={<Admin />} />
             <Route path="exams" element={<Exams />} />
             <Route path="accounts" element={<Accounts />} />
-            <Route path="student-logbook" element={<StudentDashboard />} />
-            <Route path="supervisor-logbook" element={<SupervisorDashboard />} />
-            <Route path="accessor-logbook" element={<SupervisorLogbook />} />
+            <Route path="student-logbook" element={<RequireProfile><StudentDashboard /></RequireProfile>} />
+            <Route path="supervisor-logbook" element={<RequireProfile><SupervisorDashboard /></RequireProfile>} />
+            <Route path="accessor-logbook" element={<RequireProfile><SupervisorLogbook /></RequireProfile>} />
             <Route path="supervisor-selection" element={<SupervisorSelection />} />
             <Route path="hr" element={<HR />} />
             <Route path="databank" element={<Databank />} />
           </Route>
-          <Route path="/student-dashboard" element={<RequireAuth><StudentDashboard /></RequireAuth>} />
-          <Route path="/supervisor-selection" element={<RequireAuth><SupervisorSelection /></RequireAuth>} />
-          <Route path="/supervisor-dashboard" element={<RequireAuth><SupervisorDashboard /></RequireAuth>} />
-          <Route path="/new-student-entry" element={<RequireAuth><NewStudentEntry /></RequireAuth>} />
+          <Route path="/student-dashboard" element={<RequireAuth><RequireProfile><StudentDashboard /></RequireProfile></RequireAuth>} />
+          <Route path="/supervisor-selection" element={<RequireAuth><RequireProfile><SupervisorSelection /></RequireProfile></RequireAuth>} />
+          <Route path="/supervisor-dashboard" element={<RequireAuth><RequireProfile><SupervisorDashboard /></RequireProfile></RequireAuth>} />
+          <Route path="/new-student-entry" element={<RequireAuth><RequireProfile><NewStudentEntry /></RequireProfile></RequireAuth>} />
           <Route path="*" element={<Navigate to="/login" replace />} />
         </Routes>
       </Router>

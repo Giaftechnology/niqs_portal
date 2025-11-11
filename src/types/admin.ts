@@ -13,11 +13,12 @@ export interface SupervisorProfile {
   students: string[]; // student emails
 }
 
-export type LogStatus = 'submitted' | 'approved' | 'rejected';
+export type LogStatus = 'pending' | 'submitted' | 'approved' | 'rejected';
 
 export interface AdminLogEntry {
   id: string;
   studentEmail: string;
+  dietId?: string;
   week: number;
   day: 'Monday' | 'Tuesday' | 'Wednesday' | 'Thursday' | 'Friday';
   text: string;

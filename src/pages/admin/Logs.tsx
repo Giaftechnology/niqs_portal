@@ -1,4 +1,5 @@
-import React, { useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
+import { useLocation } from 'react-router-dom';
 import { AdminStore } from '../../utils/adminStore';
 import { AdminLogEntry } from '../../types/admin';
 
@@ -6,6 +7,13 @@ const LogsPage: React.FC = () => {
   const [items, setItems] = useState<AdminLogEntry[]>(AdminStore.listLogs());
   const [q, setQ] = useState('');
   const [status, setStatus] = useState<'all'|'submitted'|'approved'|'rejected'>('all');
+  const location = useLocation();
+
+  useEffect(() => {
+    const params = new URLSearchParams(location.search);
+    const email = params.get('email');
+    if (email) setQ(email);
+  }, [location.search]);
 
   const filtered = useMemo(() => {
     return items.filter((e) => {
@@ -43,6 +51,9 @@ const LogsPage: React.FC = () => {
           </select>
         </div>
       </div>
+      {new URLSearchParams(location.search).get('email') && (
+        <div className="text-xs text-gray-500">Filtered by email: <span className="font-medium">{new URLSearchParams(location.search).get('email')}</span></div>
+      )}
 
       <div className="bg-white border border-gray-200 rounded-xl">
         <table className="w-full text-sm">

@@ -7,14 +7,49 @@ const AdminAccessors: React.FC = () => {
   const [items, setItems] = useState(AdminStore.listAccessors());
   const [modal, setModal] = useState<{ open: boolean; title: string; message?: string; onConfirm?: () => void }>({ open: false, title: '' });
   const [view, setView] = useState<{ open: boolean; title: string; body?: React.ReactNode }>({ open: false, title: '' });
-  const [input, setInput] = useState<{ open: boolean; title: string; name?: string; email?: string; onSave?: (v: {name: string; email: string}) => void }>({ open: false, title: '' });
+  const [addOpen, setAddOpen] = useState(false);
+  const [lookup, setLookup] = useState<{ id: string; result?: any; error?: string }>({ id: '' });
+  const [editOpen, setEditOpen] = useState(false);
+  const [editState, setEditState] = useState<{ id?: string; name: string; email: string }>({ name: '', email: '' });
 
+  const diets = AdminStore.listDiets();
+  const logs = AdminStore.listLogs();
+  const assignedCount = (accessorId: string) => diets.filter(d=>d.accessorIds.includes(accessorId)).length;
+  const metrics = (accessorId: string) => {
+    const dIds = diets.filter(d=>d.accessorIds.includes(accessorId)).map(d=>d.id);
+    const relevant = logs.filter(l => !l.dietId || dIds.includes(l.dietId));
+    const pending = relevant.filter(l=>l.status==='pending').length;
+    const passed = relevant.filter(l=>l.status==='approved').length;
+    const failed = relevant.filter(l=>l.status==='rejected').length;
+    const accessed = relevant.filter(l=>l.status!=='pending').length;
+    const repeating = 0;
+    return { accessed, pending, failed, passed, repeating };
+  };
   const filtered = useMemo(() => items.filter(i => `${i.name} ${i.email}`.toLowerCase().includes(q.toLowerCase())), [items, q]);
 
-  const addItem = () => setInput({ open: true, title: 'Add Accessor', onSave: ({name, email}) => { if(!name.trim()||!email.trim()) return; AdminStore.createAccessor({ name: name.trim(), email: email.trim() }); setItems(AdminStore.listAccessors()); setInput({ open:false, title:'' }); } });
+  const openAdd = () => { setAddOpen(true); setLookup({ id: '' }); };
+  const doLookup = () => {
+    const members = JSON.parse(localStorage.getItem('membership_members') || '[]') as Array<any>;
+    const found = members.find(m => m.membershipNo === lookup.id.trim());
+    if (!found) { setLookup(prev=>({ ...prev, result: undefined, error: 'Invalid membership ID' })); return; }
+    setLookup(prev=>({ ...prev, result: found, error: undefined }));
+  };
+  const confirmAddAccessor = () => {
+    if (!lookup.result) return;
+    AdminStore.createAccessor({ name: lookup.result.name, email: lookup.result.email });
+    setItems(AdminStore.listAccessors());
+    setAddOpen(false);
+  };
   const editItem = (id: string) => {
     const curr = items.find(x=>x.id===id); if(!curr) return;
-    setInput({ open:true, title:'Edit Accessor', name: curr.name, email: curr.email, onSave: ({name, email}) => { AdminStore.updateAccessor({ ...curr, name: name.trim(), email: email.trim() }); setItems(AdminStore.listAccessors()); setInput({ open:false, title:'' }); } });
+    setEditState({ id: curr.id, name: curr.name, email: curr.email });
+    setEditOpen(true);
+  };
+  const saveEdit = () => {
+    const curr = items.find(x=>x.id===editState.id); if(!curr) { setEditOpen(false); return; }
+    AdminStore.updateAccessor({ ...curr, name: editState.name.trim(), email: editState.email.trim() });
+    setItems(AdminStore.listAccessors());
+    setEditOpen(false);
   };
   const viewItem = (id: string) => {
     const curr = items.find(x=>x.id===id); if(!curr) return;
@@ -45,7 +80,7 @@ const AdminAccessors: React.FC = () => {
       </div>
       <div className="flex items-center justify-between">
         <input value={q} onChange={e=>setQ(e.target.value)} placeholder="Search Accessors" className="px-3 py-2 border rounded-md text-sm w-72"/>
-        <button onClick={addItem} className="px-3 py-2 bg-indigo-600 text-white rounded-md text-sm">+ Add New</button>
+        <button onClick={openAdd} className="px-3 py-2 bg-indigo-600 text-white rounded-md text-sm">+ Add by Membership ID</button>
       </div>
       <div className="bg-white border rounded-xl">
         <table className="w-full text-sm">
@@ -53,6 +88,12 @@ const AdminAccessors: React.FC = () => {
             <tr className="text-left">
               <th className="p-3">Name</th>
               <th className="p-3">Email</th>
+              <th className="p-3">Assigned</th>
+              <th className="p-3">Accessed</th>
+              <th className="p-3">Pending</th>
+              <th className="p-3">Failed</th>
+              <th className="p-3">Passed</th>
+              <th className="p-3">Repeating</th>
               <th className="p-3">Status</th>
               <th className="p-3">Actions</th>
             </tr>
@@ -62,6 +103,12 @@ const AdminAccessors: React.FC = () => {
               <tr key={a.id} className="border-t">
                 <td className="p-3">{a.name}</td>
                 <td className="p-3">{a.email}</td>
+                <td className="p-3">{assignedCount(a.id)}</td>
+                <td className="p-3">{metrics(a.id).accessed}</td>
+                <td className="p-3">{metrics(a.id).pending}</td>
+                <td className="p-3">{metrics(a.id).failed}</td>
+                <td className="p-3">{metrics(a.id).passed}</td>
+                <td className="p-3">{metrics(a.id).repeating}</td>
                 <td className="p-3">
                   <span className={`px-2 py-0.5 rounded text-xs ${a.active ? 'bg-green-100 text-green-700' : 'bg-gray-200 text-gray-600'}`}>{a.active ? 'Active' : 'Disabled'}</span>
                 </td>
@@ -78,29 +125,45 @@ const AdminAccessors: React.FC = () => {
       </div>
       <Modal open={modal.open} title={modal.title} onClose={()=>setModal({open:false,title:''})} onConfirm={modal.onConfirm} confirmText="Delete">{modal.message}</Modal>
       <Modal open={view.open} title={view.title} onClose={()=>setView({open:false,title:''})}>{view.body}</Modal>
-      {input.open && (
-        <AccessorInputModal title={input.title} name={input.name} email={input.email} onClose={()=>setInput({open:false,title:''})} onSave={input.onSave} />
-      )}
+      <AddAccessorByMemberModal open={addOpen} lookup={lookup} setLookup={setLookup} onLookup={doLookup} onConfirm={confirmAddAccessor} onClose={()=>setAddOpen(false)} />
+      <Modal open={editOpen} title="Edit Accessor" onClose={()=>setEditOpen(false)} onConfirm={saveEdit} confirmText="Save">
+        <div className="space-y-3">
+          <div>
+            <div className="text-xs font-medium text-gray-700 mb-1">Full Name</div>
+            <input value={editState.name} onChange={e=>setEditState({ ...editState, name: e.target.value })} className="w-full px-3 py-2 border rounded-md text-sm" />
+          </div>
+          <div>
+            <div className="text-xs font-medium text-gray-700 mb-1">Email</div>
+            <input value={editState.email} onChange={e=>setEditState({ ...editState, email: e.target.value })} className="w-full px-3 py-2 border rounded-md text-sm" />
+          </div>
+        </div>
+      </Modal>
     </div>
   );
 };
 
 export default AdminAccessors;
 
-const AccessorInputModal = ({ title, name: initName = '', email: initEmail = '', onSave, onClose }: { title: string; name?: string; email?: string; onSave?: (v: {name:string; email:string})=>void; onClose: ()=>void }) => {
-  const [name, setName] = useState(initName);
-  const [email, setEmail] = useState(initEmail);
+const AddAccessorByMemberModal = ({ open, lookup, setLookup, onLookup, onConfirm, onClose }: { open: boolean; lookup: { id: string; result?: any; error?: string }; setLookup: (v:any)=>void; onLookup: ()=>void; onConfirm: ()=>void; onClose: ()=>void }) => {
+  if (!open) return null;
   return (
-    <Modal open={true} title={title} onClose={onClose} onConfirm={() => onSave && onSave({ name, email })} confirmText="Save">
+    <Modal open={true} title="Add Accessor by Membership ID" onClose={onClose} onConfirm={lookup.result ? onConfirm : undefined} confirmText="Add as Accessor">
       <div className="space-y-3">
         <div>
-          <div className="text-xs font-medium text-gray-700 mb-1">Full Name</div>
-          <input autoFocus value={name} onChange={e=>setName(e.target.value)} placeholder="Enter full name" className="w-full px-3 py-2 border rounded-md text-sm" />
+          <div className="text-xs font-medium text-gray-700 mb-1">Membership ID</div>
+          <div className="flex gap-2">
+            <input autoFocus value={lookup.id} onChange={e=>setLookup({ ...lookup, id: e.target.value })} placeholder="e.g. NIQS-2025-1234" className="w-full px-3 py-2 border rounded-md text-sm" />
+            <button onClick={onLookup} className="px-3 py-2 text-sm border rounded-md">Lookup</button>
+          </div>
+          {lookup.error && <div className="text-xs text-red-600 mt-1">{lookup.error}</div>}
         </div>
-        <div>
-          <div className="text-xs font-medium text-gray-700 mb-1">Email</div>
-          <input value={email} onChange={e=>setEmail(e.target.value)} placeholder="name@example.com" className="w-full px-3 py-2 border rounded-md text-sm" />
-        </div>
+        {lookup.result && (
+          <div className="border-t pt-3 text-sm text-gray-700 space-y-1">
+            <div><span className="text-gray-500">Name:</span> {lookup.result.name}</div>
+            <div><span className="text-gray-500">Email:</span> {lookup.result.email}</div>
+            {lookup.result.membershipNo && <div><span className="text-gray-500">Membership No.:</span> {lookup.result.membershipNo}</div>}
+          </div>
+        )}
       </div>
     </Modal>
   );
