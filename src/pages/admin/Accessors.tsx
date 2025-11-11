@@ -14,10 +14,12 @@ const AdminAccessors: React.FC = () => {
 
   const diets = AdminStore.listDiets();
   const logs = AdminStore.listLogs();
+  const [dietFilter, setDietFilter] = useState<string>('all');
   const assignedCount = (accessorId: string) => diets.filter(d=>d.accessorIds.includes(accessorId)).length;
   const metrics = (accessorId: string) => {
-    const dIds = diets.filter(d=>d.accessorIds.includes(accessorId)).map(d=>d.id);
-    const relevant = logs.filter(l => !l.dietId || dIds.includes(l.dietId));
+    const assignedDietIds = diets.filter(d=>d.accessorIds.includes(accessorId)).map(d=>d.id);
+    const scopeDietIds = dietFilter==='all' ? assignedDietIds : assignedDietIds.filter(id=>id===dietFilter);
+    const relevant = logs.filter(l => l.dietId && scopeDietIds.includes(l.dietId));
     const pending = relevant.filter(l=>l.status==='pending').length;
     const passed = relevant.filter(l=>l.status==='approved').length;
     const failed = relevant.filter(l=>l.status==='rejected').length;
@@ -78,8 +80,14 @@ const AdminAccessors: React.FC = () => {
         <span aria-hidden>🧑‍⚖️</span>
         <span>Accessors</span>
       </div>
-      <div className="flex items-center justify-between">
-        <input value={q} onChange={e=>setQ(e.target.value)} placeholder="Search Accessors" className="px-3 py-2 border rounded-md text-sm w-72"/>
+      <div className="flex items-center justify-between gap-3 flex-wrap">
+        <div className="flex items-center gap-2">
+          <input value={q} onChange={e=>setQ(e.target.value)} placeholder="Search Accessors" className="px-3 py-2 border rounded-md text-sm w-72"/>
+          <select value={dietFilter} onChange={e=>setDietFilter(e.target.value)} className="px-3 py-2 border rounded-md text-sm">
+            <option value="all">All Diets</option>
+            {diets.map(d => (<option key={d.id} value={d.id}>{d.sessionName} - {d.diet}</option>))}
+          </select>
+        </div>
         <button onClick={openAdd} className="px-3 py-2 bg-indigo-600 text-white rounded-md text-sm">+ Add by Membership ID</button>
       </div>
       <div className="bg-white border rounded-xl">
@@ -89,11 +97,6 @@ const AdminAccessors: React.FC = () => {
               <th className="p-3">Name</th>
               <th className="p-3">Email</th>
               <th className="p-3">Assigned</th>
-              <th className="p-3">Accessed</th>
-              <th className="p-3">Pending</th>
-              <th className="p-3">Failed</th>
-              <th className="p-3">Passed</th>
-              <th className="p-3">Repeating</th>
               <th className="p-3">Status</th>
               <th className="p-3">Actions</th>
             </tr>
@@ -104,11 +107,6 @@ const AdminAccessors: React.FC = () => {
                 <td className="p-3">{a.name}</td>
                 <td className="p-3">{a.email}</td>
                 <td className="p-3">{assignedCount(a.id)}</td>
-                <td className="p-3">{metrics(a.id).accessed}</td>
-                <td className="p-3">{metrics(a.id).pending}</td>
-                <td className="p-3">{metrics(a.id).failed}</td>
-                <td className="p-3">{metrics(a.id).passed}</td>
-                <td className="p-3">{metrics(a.id).repeating}</td>
                 <td className="p-3">
                   <span className={`px-2 py-0.5 rounded text-xs ${a.active ? 'bg-green-100 text-green-700' : 'bg-gray-200 text-gray-600'}`}>{a.active ? 'Active' : 'Disabled'}</span>
                 </td>

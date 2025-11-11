@@ -138,9 +138,6 @@ const AdminLayout: React.FC = () => {
             </button>
             {logbookOpen && (
               <div className="ml-2 space-y-1">
-                <NavLink to="/admin/logbook/supervisors" className={navItemClass as any}>
-                  <Users2 size={18} /> Supervisors
-                </NavLink>
                 <NavLink to="/admin/logbook/accessors" className={navItemClass as any}>
                   <ShieldCheck size={18} /> Accessors
                 </NavLink>

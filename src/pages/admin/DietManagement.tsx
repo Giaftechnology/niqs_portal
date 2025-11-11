@@ -71,7 +71,19 @@ const AdminDietManagement: React.FC = () => {
                 <td className="p-3">{v.diet}</td>
                 <td className="p-3">{v.year}</td>
                 <td className="p-3">{v.startDate}</td>
-                <td className="p-3"><span className={`px-2 py-0.5 rounded text-xs ${v.status==='open'?'bg-green-100 text-green-700':'bg-gray-200 text-gray-600'}`}>{v.status}</span></td>
+                <td className="p-3">
+                  <span
+                    className={`px-2 py-0.5 rounded text-xs ${
+                      v.status === 'open'
+                        ? 'bg-green-100 text-green-700'
+                        : v.status === 'pending'
+                        ? 'bg-amber-100 text-amber-700'
+                        : 'bg-gray-200 text-gray-600'
+                    }`}
+                  >
+                    {v.status}
+                  </span>
+                </td>
                 <td className="p-3 space-x-2">
                   <button onClick={()=>openDetails(v.id)} className="px-2 py-1 text-xs border rounded">View</button>
                   <button onClick={()=>editItem(v.id)} className="px-2 py-1 text-xs border rounded">✏️</button>

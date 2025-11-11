@@ -43,6 +43,7 @@ import AdminStudents from './pages/admin/Students';
 import AdminSubmissions from './pages/admin/Submissions';
 import AdminDietManagement from './pages/admin/DietManagement';
 import AdminDietDetail from './pages/admin/DietDetail';
+import SubmissionDetail from './pages/admin/SubmissionDetail';
 import AdminVendors from './pages/admin/Vendors';
 import AdminRequisitions from './pages/admin/Requisitions';
 import SupervisorAssignments from './pages/admin/SupervisorAssignments';
@@ -104,6 +105,7 @@ const App: React.FC = () => {
             <Route path="logbook/accessors" element={<AdminAccessors />} />
             <Route path="logbook/diet-management" element={<AdminDietManagement />} />
             <Route path="logbook/diet-management/:id" element={<AdminDietDetail />} />
+            <Route path="logbook/diet-management/:id/submissions/:sid" element={<SubmissionDetail />} />
             <Route path="settings" element={<AdminSettings />} />
             <Route path="databank" element={<AdminDashboard />} />
           </Route>

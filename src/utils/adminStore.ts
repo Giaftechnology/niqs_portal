@@ -39,8 +39,8 @@ export const AdminStore = {
     if (!localStorage.getItem(DIETS_KEY)) {
       const dietId = id();
       const diets = [
-        { id: dietId, sessionName: '2025 Session', diet: 'Diet 1', year: new Date().getFullYear(), startDate: new Date().toISOString().slice(0,10), status: 'open', accessorIds: [] as string[] },
-        { id: id(), sessionName: '2025 Session', diet: 'Diet 2', year: new Date().getFullYear(), startDate: new Date(Date.now()+86400000*30).toISOString().slice(0,10), status: 'open', accessorIds: [] as string[] },
+        { id: dietId, sessionName: '2025 Session', diet: 'Diet 1', year: new Date().getFullYear(), startDate: new Date().toISOString().slice(0,10), status: 'pending', accessorIds: [] as string[] },
+        { id: id(), sessionName: '2025 Session', diet: 'Diet 2', year: new Date().getFullYear(), startDate: new Date(Date.now()+86400000*30).toISOString().slice(0,10), status: 'pending', accessorIds: [] as string[] },
       ];
       localStorage.setItem(DIETS_KEY, JSON.stringify(diets));
     }
@@ -394,23 +394,23 @@ export const AdminStore = {
   },
 
   // Diets
-  listDiets(): Array<{ id: string; sessionName: string; diet: string; year: number; startDate: string; status: 'open'|'closed'; accessorIds: string[] }> {
+  listDiets(): Array<{ id: string; sessionName: string; diet: string; year: number; startDate: string; status: 'pending'|'open'|'closed'; accessorIds: string[] }> {
     try {
       const arr = JSON.parse(localStorage.getItem(DIETS_KEY) || '[]');
-      return (arr as any[]).map(d => ({ status: 'open', accessorIds: [], ...d }));
+      return (arr as any[]).map(d => ({ status: 'pending', accessorIds: [], ...d }));
     } catch { return []; }
   },
-  saveDiets(list: Array<{ id: string; sessionName: string; diet: string; year: number; startDate: string; status: 'open'|'closed'; accessorIds: string[] }>) {
+  saveDiets(list: Array<{ id: string; sessionName: string; diet: string; year: number; startDate: string; status: 'pending'|'open'|'closed'; accessorIds: string[] }>) {
     localStorage.setItem(DIETS_KEY, JSON.stringify(list));
   },
   createDiet(data: { sessionName: string; diet: string; year: number; startDate: string }) {
     const all = this.listDiets();
-    const item = { id: id(), status: 'open' as const, accessorIds: [] as string[], ...data };
+    const item = { id: id(), status: 'pending' as const, accessorIds: [] as string[], ...data };
     all.push(item);
     this.saveDiets(all);
     return item;
   },
-  updateDiet(item: { id: string; sessionName: string; diet: string; year: number; startDate: string; status: 'open'|'closed'; accessorIds: string[] }) {
+  updateDiet(item: { id: string; sessionName: string; diet: string; year: number; startDate: string; status: 'pending'|'open'|'closed'; accessorIds: string[] }) {
     this.saveDiets(this.listDiets().map(x=>x.id===item.id?item:x));
   },
   deleteDiet(idStr: string) {
@@ -423,6 +423,10 @@ export const AdminStore = {
     const set = new Set(diets[idx].accessorIds);
     set.add(accessorId);
     diets[idx].accessorIds = Array.from(set);
+    // Transition to 'open' when first accessor is assigned (start assessment)
+    if (diets[idx].status === 'pending') {
+      diets[idx].status = 'open';
+    }
     this.saveDiets(diets);
   },
   unassignAccessorFromDiet(dietId: string, accessorId: string) {
@@ -432,7 +436,7 @@ export const AdminStore = {
     diets[idx].accessorIds = diets[idx].accessorIds.filter(id=>id!==accessorId);
     this.saveDiets(diets);
   },
-  setDietStatus(dietId: string, status: 'open'|'closed') {
+  setDietStatus(dietId: string, status: 'pending'|'open'|'closed') {
     const diets = this.listDiets();
     const idx = diets.findIndex(d=>d.id===dietId);
     if (idx<0) return;
