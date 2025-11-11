@@ -35,12 +35,24 @@ export const AdminStore = {
       ];
       localStorage.setItem(SUPS_KEY, JSON.stringify(sups));
     }
+    // Diets seed
+    if (!localStorage.getItem(DIETS_KEY)) {
+      const dietId = id();
+      const diets = [
+        { id: dietId, sessionName: '2025 Session', diet: 'Diet 1', year: new Date().getFullYear(), startDate: new Date().toISOString().slice(0,10), status: 'open', accessorIds: [] as string[] },
+        { id: id(), sessionName: '2025 Session', diet: 'Diet 2', year: new Date().getFullYear(), startDate: new Date(Date.now()+86400000*30).toISOString().slice(0,10), status: 'open', accessorIds: [] as string[] },
+      ];
+      localStorage.setItem(DIETS_KEY, JSON.stringify(diets));
+    }
     // Logs
     if (!localStorage.getItem(LOGS_KEY)) {
+      const diets = this.listDiets();
+      const firstDiet = diets[0]?.id;
       const logs: AdminLogEntry[] = [
-        { id: 'l1', studentEmail: 'student1@niqs.org', week: 1, day: 'Monday', text: 'Surveyed plots and recorded data.', status: 'submitted', createdAt: Date.now()-86400000*3 },
-        { id: 'l2', studentEmail: 'student1@niqs.org', week: 1, day: 'Tuesday', text: 'Computed quantities with QS tools.', status: 'approved', createdAt: Date.now()-86400000*2 },
-        { id: 'l3', studentEmail: 'student2@niqs.org', week: 2, day: 'Wednesday', text: 'Site visit and safety briefing.', status: 'rejected', createdAt: Date.now()-86400000 },
+        { id: id(), studentEmail: 'student1@niqs.org', dietId: firstDiet, week: 1, day: 'Monday', text: 'Surveyed plots and recorded data.', status: 'submitted', createdAt: Date.now()-86400000*3 },
+        { id: id(), studentEmail: 'student1@niqs.org', dietId: firstDiet, week: 1, day: 'Tuesday', text: 'Computed quantities with QS tools.', status: 'approved', createdAt: Date.now()-86400000*2 },
+        { id: id(), studentEmail: 'student2@niqs.org', dietId: firstDiet, week: 2, day: 'Wednesday', text: 'Site visit and safety briefing.', status: 'rejected', createdAt: Date.now()-86400000 },
+        { id: id(), studentEmail: 'student2@niqs.org', dietId: firstDiet, week: 2, day: 'Thursday', text: 'Prepared BOQ draft for review.', status: 'pending', createdAt: Date.now()-3600000 },
       ];
       localStorage.setItem(LOGS_KEY, JSON.stringify(logs));
     }
@@ -83,17 +95,18 @@ export const AdminStore = {
 
     // Accessors seed
     if (!localStorage.getItem(ACCESSORS_KEY)) {
+      const aid = id();
       const accessors = [
-        { id: id(), name: 'Dr. Adewale', email: 'adewale@niqs.org', active: true, createdAt: new Date().toISOString() },
+        { id: aid, name: 'Dr. Adewale', email: 'adewale@niqs.org', active: true, createdAt: new Date().toISOString() },
+        { id: id(), name: 'Engr. Chika', email: 'chika@niqs.org', active: true, createdAt: new Date().toISOString() },
       ];
       localStorage.setItem(ACCESSORS_KEY, JSON.stringify(accessors));
-    }
-    // Diets seed
-    if (!localStorage.getItem(DIETS_KEY)) {
-      const diets = [
-        { id: id(), sessionName: '2025 Session', diet: 'Diet 1', year: new Date().getFullYear(), startDate: new Date().toISOString().slice(0,10) },
-      ];
-      localStorage.setItem(DIETS_KEY, JSON.stringify(diets));
+      // assign first accessor to first diet
+      const diets = this.listDiets();
+      if (diets[0]) {
+        diets[0].accessorIds = Array.from(new Set([...(diets[0].accessorIds||[]), aid]));
+        this.saveDiets(diets);
+      }
     }
     // Exams seed
     if (!localStorage.getItem(EXAMS_KEY)) {
@@ -129,6 +142,53 @@ export const AdminStore = {
         { id: id(), number: 'PO-0001', vendor: 'Acme Supplies', amount: 85000, status: 'Draft', createdAt: new Date().toISOString() },
       ];
       localStorage.setItem(POS_KEY, JSON.stringify(pos));
+    }
+  },
+  // Convenience for tests: seed membership datasets if missing
+  seedMembership() {
+    if (!localStorage.getItem('membership_members')) {
+      const members = [
+        { id: id(), name: 'Bola Akin', email: 'bola@niqs.org', phone: '+2348100000001', department: 'QS', membershipNo: 'NIQS-2025-1001' },
+        { id: id(), name: 'Chioma Uche', email: 'chioma@niqs.org', phone: '+2348100000002', department: 'QS', membershipNo: 'NIQS-2025-1002' },
+      ];
+      localStorage.setItem('membership_members', JSON.stringify(members));
+    }
+    if (!localStorage.getItem('membership_probationals')) {
+      const list = [
+        { id: id(), name: 'Ifeanyi Kalu', email: 'ifeanyi@niqs.org', phone: '+2348100000003', department: 'QS' },
+      ];
+      localStorage.setItem('membership_probationals', JSON.stringify(list));
+    }
+    if (!localStorage.getItem('membership_graduates')) {
+      const list = [
+        { id: id(), name: 'Zainab Musa', email: 'zainab@niqs.org', phone: '+2348100000004', department: 'QS' },
+      ];
+      localStorage.setItem('membership_graduates', JSON.stringify(list));
+    }
+    if (!localStorage.getItem('membership_students')) {
+      const list = [
+        { id: id(), name: 'New Student', email: 'student1@niqs.org', phone: '+2348100000005', department: 'QS' },
+      ];
+      localStorage.setItem('membership_students', JSON.stringify(list));
+    }
+    if (!localStorage.getItem('membership_matured')) {
+      const list = [
+        { id: id(), name: 'Matured Member', email: 'matured@niqs.org', phone: '+2348100000006', department: 'QS' },
+      ];
+      localStorage.setItem('membership_matured', JSON.stringify(list));
+    }
+    if (!localStorage.getItem('membership_applications')) {
+      const apps = [
+        { id: id(), name: 'Samuel Okon', email: 'okon@niqs.org', phone: '+2348100000007', department: 'QS', status: 'pending' },
+        { id: id(), name: 'Adaobi N', email: 'adaobi@niqs.org', phone: '+2348100000008', department: 'QS', status: 'accepted', membershipNo: 'NIQS-2025-2001' },
+        { id: id(), name: 'Usman Bello', email: 'usman@niqs.org', phone: '+2348100000009', department: 'QS', status: 'rejected' },
+      ];
+      localStorage.setItem('membership_applications', JSON.stringify(apps));
+      // ensure accepted app is present in members
+      const members = JSON.parse(localStorage.getItem('membership_members') || '[]');
+      const accepted = apps.filter(a=>a.status==='accepted');
+      accepted.forEach(a => { if (!members.find((m:any)=>m.email===a.email)) members.push({ id: a.id, name: a.name, email: a.email, phone: a.phone, department: a.department, membershipNo: a.membershipNo }); });
+      localStorage.setItem('membership_members', JSON.stringify(members));
     }
   },
   // Users
@@ -334,24 +394,50 @@ export const AdminStore = {
   },
 
   // Diets
-  listDiets(): Array<{ id: string; sessionName: string; diet: string; year: number; startDate: string }> {
-    try { return JSON.parse(localStorage.getItem(DIETS_KEY) || '[]'); } catch { return []; }
+  listDiets(): Array<{ id: string; sessionName: string; diet: string; year: number; startDate: string; status: 'open'|'closed'; accessorIds: string[] }> {
+    try {
+      const arr = JSON.parse(localStorage.getItem(DIETS_KEY) || '[]');
+      return (arr as any[]).map(d => ({ status: 'open', accessorIds: [], ...d }));
+    } catch { return []; }
   },
-  saveDiets(list: Array<{ id: string; sessionName: string; diet: string; year: number; startDate: string }>) {
+  saveDiets(list: Array<{ id: string; sessionName: string; diet: string; year: number; startDate: string; status: 'open'|'closed'; accessorIds: string[] }>) {
     localStorage.setItem(DIETS_KEY, JSON.stringify(list));
   },
   createDiet(data: { sessionName: string; diet: string; year: number; startDate: string }) {
     const all = this.listDiets();
-    const item = { id: id(), ...data };
+    const item = { id: id(), status: 'open' as const, accessorIds: [] as string[], ...data };
     all.push(item);
     this.saveDiets(all);
     return item;
   },
-  updateDiet(item: { id: string; sessionName: string; diet: string; year: number; startDate: string }) {
+  updateDiet(item: { id: string; sessionName: string; diet: string; year: number; startDate: string; status: 'open'|'closed'; accessorIds: string[] }) {
     this.saveDiets(this.listDiets().map(x=>x.id===item.id?item:x));
   },
   deleteDiet(idStr: string) {
     this.saveDiets(this.listDiets().filter(x=>x.id!==idStr));
+  },
+  assignAccessorToDiet(dietId: string, accessorId: string) {
+    const diets = this.listDiets();
+    const idx = diets.findIndex(d=>d.id===dietId);
+    if (idx<0) return;
+    const set = new Set(diets[idx].accessorIds);
+    set.add(accessorId);
+    diets[idx].accessorIds = Array.from(set);
+    this.saveDiets(diets);
+  },
+  unassignAccessorFromDiet(dietId: string, accessorId: string) {
+    const diets = this.listDiets();
+    const idx = diets.findIndex(d=>d.id===dietId);
+    if (idx<0) return;
+    diets[idx].accessorIds = diets[idx].accessorIds.filter(id=>id!==accessorId);
+    this.saveDiets(diets);
+  },
+  setDietStatus(dietId: string, status: 'open'|'closed') {
+    const diets = this.listDiets();
+    const idx = diets.findIndex(d=>d.id===dietId);
+    if (idx<0) return;
+    diets[idx].status = status;
+    this.saveDiets(diets);
   },
 
   // Exams

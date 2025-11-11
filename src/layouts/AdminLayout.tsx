@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { Link, NavLink, Outlet, useLocation, useNavigate } from 'react-router-dom';
-import { LayoutGrid, Users2, Settings, Database, LogOut, Shield, Menu, X, Puzzle, Wrench, ShieldCheck, LockKeyhole, Boxes, BookOpen, Calendar, ClipboardList, Store, FileText, GraduationCap, Inbox, UtensilsCrossed, ChevronDown, ChevronRight } from 'lucide-react';
+import { LayoutGrid, Users2, Settings, Database, LogOut, Shield, Menu, X, Puzzle, Wrench, ShieldCheck, LockKeyhole, Boxes, BookOpen, Calendar, ClipboardList, Store, FileText, GraduationCap, Inbox, UtensilsCrossed, ChevronDown, ChevronRight, UserCircle2 } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 import { AdminStore } from '../utils/adminStore';
 
@@ -17,9 +17,12 @@ const AdminLayout: React.FC = () => {
   const [accessOpen, setAccessOpen] = useState(false);
   const [procureOpen, setProcureOpen] = useState(false);
   const [logbookOpen, setLogbookOpen] = useState(false);
+  const [membershipOpen, setMembershipOpen] = useState(false);
+  const [avatarOpen, setAvatarOpen] = useState(false);
 
   useEffect(() => {
     AdminStore.seed();
+    AdminStore.seedMembership();
   }, []);
 
   useEffect(() => {
@@ -49,11 +52,22 @@ const AdminLayout: React.FC = () => {
           </div>
           </Link>
         </div>
-        <div className="flex items-center gap-4">
-          <div className="text-xs text-gray-500 hidden sm:block">{user?.email}</div>
-          <button onClick={handleLogout} className="px-3 py-1.5 text-sm rounded-md border border-gray-200 hover:bg-gray-50 flex items-center gap-2">
-            <LogOut size={16} /> Logout
+        <div className="relative">
+          <button onClick={()=>setAvatarOpen(v=>!v)} className="flex items-center gap-2">
+            <div className="w-8 h-8 rounded-full bg-indigo-600 text-white flex items-center justify-center text-sm font-semibold">
+              {user?.email?.[0]?.toUpperCase() || 'A'}
+            </div>
           </button>
+          {avatarOpen && (
+            <div className="absolute right-0 mt-2 w-40 bg-white border border-gray-200 rounded-lg shadow-sm z-50">
+              <button onClick={()=>{ setAvatarOpen(false); navigate('/admin/profile'); }} className="w-full flex items-center gap-2 px-3 py-2 text-sm hover:bg-gray-50">
+                <UserCircle2 size={16}/> Profile
+              </button>
+              <button onClick={()=>{ setAvatarOpen(false); handleLogout(); }} className="w-full flex items-center gap-2 px-3 py-2 text-sm hover:bg-gray-50">
+                <LogOut size={16}/> Logout
+              </button>
+            </div>
+          )}
         </div>
       </header>
       <div className="flex">
@@ -68,7 +82,7 @@ const AdminLayout: React.FC = () => {
               <LayoutGrid size={18} /> Overview
             </NavLink>
             <NavLink to="/admin/users" className={navItemClass as any}>
-              <Users2 size={18} /> Users
+              <Users2 size={18} /> Staffs
             </NavLink>
             <NavLink to="/admin/logs" className={navItemClass as any}>
               <Database size={18} /> Logs
@@ -127,20 +141,41 @@ const AdminLayout: React.FC = () => {
                 <NavLink to="/admin/logbook/supervisors" className={navItemClass as any}>
                   <Users2 size={18} /> Supervisors
                 </NavLink>
-                <NavLink to="/admin/logbook/supervisor-assignments" className={navItemClass as any}>
-                  <Users2 size={18} /> Supervisor Assignments
-                </NavLink>
                 <NavLink to="/admin/logbook/accessors" className={navItemClass as any}>
                   <ShieldCheck size={18} /> Accessors
                 </NavLink>
-                <NavLink to="/admin/logbook/students" className={navItemClass as any}>
-                  <GraduationCap size={18} /> Students
-                </NavLink>
-                <NavLink to="/admin/logbook/submissions" className={navItemClass as any}>
-                  <Inbox size={18} /> Submissions
-                </NavLink>
                 <NavLink to="/admin/logbook/diet-management" className={navItemClass as any}>
                   <UtensilsCrossed size={18} /> Diet Management
+                </NavLink>
+              </div>
+            )}
+
+            <button onClick={()=>setMembershipOpen(v=>!v)} className="w-full flex items-center justify-between px-3 py-2 rounded-lg text-sm mt-4 text-gray-700 hover:bg-gray-50">
+              <span className="flex items-center gap-2"><GraduationCap size={14}/> Membership</span>
+              {membershipOpen ? <ChevronDown size={14}/> : <ChevronRight size={14}/>}
+            </button>
+            {membershipOpen && (
+              <div className="ml-2 space-y-1">
+                <NavLink to="/admin/membership" end className={navItemClass as any}>
+                  <LayoutGrid size={18} /> Dashboard
+                </NavLink>
+                <NavLink to="/admin/membership/probationals" className={navItemClass as any}>
+                  <GraduationCap size={18} /> Probationals
+                </NavLink>
+                <NavLink to="/admin/membership/graduates" className={navItemClass as any}>
+                  <GraduationCap size={18} /> Graduates
+                </NavLink>
+                <NavLink to="/admin/membership/students" className={navItemClass as any}>
+                  <GraduationCap size={18} /> Students
+                </NavLink>
+                <NavLink to="/admin/membership/matured-routes" className={navItemClass as any}>
+                  <GraduationCap size={18} /> Matured Routes
+                </NavLink>
+                <NavLink to="/admin/membership/applications" className={navItemClass as any}>
+                  <Inbox size={18} /> Applications
+                </NavLink>
+                <NavLink to="/admin/membership/members" className={navItemClass as any}>
+                  <Users2 size={18} /> Members
                 </NavLink>
               </div>
             )}
