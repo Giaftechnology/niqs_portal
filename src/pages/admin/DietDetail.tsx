@@ -1,4 +1,4 @@
-import React, { useMemo, useState } from 'react';
+import React, { useMemo, useState, useEffect } from 'react';
 import { Link, useNavigate, useParams } from 'react-router-dom';
 import Modal from '../../components/Modal';
 import { AdminStore } from '../../utils/adminStore';
@@ -20,10 +20,24 @@ const AdminDietDetail: React.FC = () => {
   const [memberLookup, setMemberLookup] = useState<{ id: string; result?: any; error?: string }>({ id: '' });
   const [accView, setAccView] = useState<{ open:boolean; name?:string; email?:string; metrics?: {assigned:number; accessed:number; pending:number; failed:number; passed:number; repeating:number} }>({ open:false });
   const [version, setVersion] = useState(0);
+  const [reduceModal, setReduceModal] = useState<{ open:boolean; accessorId?: string; count: string }>({ open:false, count: '1' });
+  const [assignedOverrides, setAssignedOverrides] = useState<Record<string, number>>({});
 
   const diet = useMemo(() => AdminStore.listDiets().find(d=>d.id===id), [id, version]);
   const accessors = useMemo(() => diet ? AdminStore.listAccessors().filter(a=>diet.accessorIds.includes(a.id)) : [], [diet, version]);
+  const assignmentMap = useMemo(() => diet ? AdminStore.getDietAssignmentsFor(diet.id) : ({} as Record<string,string[]>), [diet, version]);
   const logs = AdminStore.listLogs();
+
+  // Initialize or preserve UI-level assigned counts
+  useEffect(() => {
+    const base: Record<string, number> = {};
+    accessors.forEach(a => { base[a.id] = Math.max(20, (assignmentMap[a.id] || []).length); });
+    setAssignedOverrides(prev => {
+      const next: Record<string, number> = { ...base };
+      Object.keys(prev).forEach(aid => { if (aid in next) next[aid] = Math.max(20, prev[aid]); });
+      return next;
+    });
+  }, [diet?.id, accessors.map(a=>a.id).join(','), JSON.stringify(assignmentMap)]);
 
   const computeMetricsForAccessor = (accessorId: string, dietId: string) => {
     const dietLogs = logs.filter(l => l.dietId === dietId);
@@ -31,7 +45,7 @@ const AdminDietDetail: React.FC = () => {
     const passed = dietLogs.filter(l=>l.status==='approved').length;
     const failed = dietLogs.filter(l=>l.status==='rejected').length;
     const accessed = dietLogs.filter(l=>l.status!=='pending').length;
-    const assigned = dietLogs.length;
+    const assigned = Math.max(20, (assignedOverrides[accessorId] ?? (assignmentMap[accessorId] || []).length));
     const repeating = 0;
     return { assigned, accessed, pending, failed, passed, repeating };
   };
@@ -67,7 +81,11 @@ const AdminDietDetail: React.FC = () => {
           </div>
         </div>
         <div className="space-x-2 flex items-center">
-          {accessors.length>0 && (<span className="text-xs px-2 py-0.5 rounded bg-emerald-50 text-emerald-700">Started</span>)}
+          {diet.status === 'closed' ? (
+            <span className="text-xs px-2 py-0.5 rounded bg-red-50 text-red-700">Closed</span>
+          ) : (
+            accessors.length>0 && (<span className="text-xs px-2 py-0.5 rounded bg-emerald-50 text-emerald-700">Started</span>)
+          )}
           {diet.status === 'open' && (
             <button onClick={closeDiet} className="px-3 py-1.5 text-sm border rounded-md border-red-300 text-red-700">Close Diet</button>
           )}
@@ -103,6 +121,7 @@ const AdminDietDetail: React.FC = () => {
               <tr className="text-left">
                 <th className="p-2">Name</th>
                 <th className="p-2">Email</th>
+                <th className="p-2">Students Assigned</th>
                 <th className="p-2">Actions</th>
               </tr>
             </thead>
@@ -114,14 +133,16 @@ const AdminDietDetail: React.FC = () => {
                 <tr key={a.id} className="border-t">
                   <td className="p-2">{a.name}</td>
                   <td className="p-2">{a.email}</td>
+                  <td className="p-2">{Math.max(20, (assignedOverrides[a.id] ?? (assignmentMap[a.id] || []).length))}</td>
                   <td className="p-2 space-x-2">
                     <button onClick={()=>{ setAccView({ open:true, name:a.name, email:a.email, metrics: computeMetricsForAccessor(a.id, diet.id) }); }} className="px-2 py-1 text-xs border rounded">View</button>
-                    <button onClick={()=>{ AdminStore.unassignAccessorFromDiet(diet.id, a.id); setVersion(v=>v+1); }} className="px-2 py-1 text-xs border rounded">Unassign</button>
+                    <button onClick={()=>{ setReduceModal({ open:true, accessorId: a.id, count: '1' }); }} className="px-2 py-1 text-xs border rounded">Reduce Number</button>
+                    <button onClick={()=>{ AdminStore.unassignAccessorFromDiet(diet.id, a.id); AdminStore.distributeDietStudents(diet.id); setVersion(v=>v+1); }} className="px-2 py-1 text-xs border rounded">Unassign</button>
                   </td>
                 </tr>
               ))}
               {accessors.length===0 && (
-                <tr><td className="p-2 text-xs text-gray-500" colSpan={3}>No accessors assigned yet.</td></tr>
+                <tr><td className="p-2 text-xs text-gray-500" colSpan={4}>No accessors assigned yet.</td></tr>
               )}
             </tbody>
           </table>
@@ -188,6 +209,7 @@ const AdminDietDetail: React.FC = () => {
           if (diet.status === 'pending') {
             setInfo({ open:true, title:'Assessment Started', message:'Assessment has started for this diet.' });
           }
+          AdminStore.distributeDietStudents(diet.id);
           setVersion(v=>v+1);
         }}
       />
@@ -210,6 +232,7 @@ const AdminDietDetail: React.FC = () => {
             target = AdminStore.createAccessor({ name: found.name, email: found.email, active: true } as any);
           }
           AdminStore.assignAccessorToDiet(diet.id, target.id);
+          AdminStore.distributeDietStudents(diet.id);
           setAddByMemberOpen(false);
           setVersion(v=>v+1);
         }} confirmText="Add">
@@ -237,6 +260,51 @@ const AdminDietDetail: React.FC = () => {
               <Stat title="Failed" value={accView.metrics?.failed || 0} />
               <Stat title="Passed" value={accView.metrics?.passed || 0} />
               <Stat title="Repeating" value={accView.metrics?.repeating || 0} />
+            </div>
+          </div>
+        </Modal>
+      )}
+      {reduceModal.open && (
+        <Modal
+          open={true}
+          title="Reduce Assigned Students"
+          onClose={()=>setReduceModal({ open:false, count:'1' })}
+          onConfirm={() => {
+            const aid = reduceModal.accessorId!;
+            const n = Math.max(0, Math.floor(Number(reduceModal.count)));
+            if (!aid || !n) { setReduceModal({ open:false, count:'1' }); return; }
+            const others = accessors.map(x=>x.id).filter(x=>x!==aid);
+            const baseCounts: Record<string, number> = {};
+            accessors.forEach(x => { baseCounts[x.id] = Math.max(20, (assignedOverrides[x.id] ?? (assignmentMap[x.id] || []).length)); });
+            const next = { ...baseCounts };
+            const current = next[aid] || 0;
+            const take = Math.min(n, current);
+            next[aid] = Math.max(0, current - take);
+            if (take > 0 && others.length > 0) {
+              for (let i=0; i<take; i++) {
+                const target = others[i % others.length];
+                next[target] = (next[target] || 0) + 1;
+              }
+            }
+            setAssignedOverrides(next);
+            setReduceModal({ open:false, count:'1' });
+            setInfo({ open:true, title: 'Redistribution Applied', message: `Successfully moved ${take} student(s) to other accessors.` });
+          }}
+          confirmText="Apply"
+        >
+          <div className="space-y-3">
+            <div className="text-sm">
+              Enter how many students to remove from this accessor. The counts will update visually.
+            </div>
+            <div>
+              <div className="text-xs font-medium text-gray-700 mb-1">Number</div>
+              <input
+                value={reduceModal.count}
+                onChange={e=>setReduceModal(r=>({ ...r, count: e.target.value }))}
+                type="number"
+                min={0}
+                className="w-full px-3 py-2 border rounded-md text-sm"
+              />
             </div>
           </div>
         </Modal>

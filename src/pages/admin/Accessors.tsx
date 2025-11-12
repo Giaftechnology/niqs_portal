@@ -111,10 +111,10 @@ const AdminAccessors: React.FC = () => {
                   <span className={`px-2 py-0.5 rounded text-xs ${a.active ? 'bg-green-100 text-green-700' : 'bg-gray-200 text-gray-600'}`}>{a.active ? 'Active' : 'Disabled'}</span>
                 </td>
                 <td className="p-3 space-x-2">
-                  <button onClick={()=>viewItem(a.id)} className="px-2 py-1 text-xs border rounded">👁️</button>
-                  <button onClick={()=>editItem(a.id)} className="px-2 py-1 text-xs border rounded">✏️</button>
-                  <button onClick={()=>disableItem(a.id)} className="px-2 py-1 text-xs border rounded">{a.active ? 'Disable' : 'Enable'}</button>
-                  <button onClick={()=>deleteItem(a.id)} className="px-2 py-1 text-xs bg-red-500 text-white rounded">🗑️</button>
+                  <button onClick={()=>viewItem(a.id)} className="px-2 py-1 text-xs border rounded bg-blue-50 text-blue-700 border-blue-200 hover:bg-blue-100">👁️</button>
+                  <button onClick={()=>editItem(a.id)} className="px-2 py-1 text-xs border rounded bg-amber-50 text-amber-700 border-amber-200 hover:bg-amber-100">✏️</button>
+                  <button onClick={()=>disableItem(a.id)} className={`px-2 py-1 text-xs border rounded ${a.active ? 'bg-orange-50 text-orange-700 border-orange-200 hover:bg-orange-100' : 'bg-green-50 text-green-700 border-green-200 hover:bg-green-100'}`}>{a.active ? 'Disable' : 'Enable'}</button>
+                  <button onClick={()=>deleteItem(a.id)} className="px-2 py-1 text-xs border rounded bg-red-50 text-red-700 border-red-200 hover:bg-red-100">🗑️</button>
                 </td>
               </tr>
             ))}

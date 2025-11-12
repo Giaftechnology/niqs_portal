@@ -1,20 +1,44 @@
-import React, { useState, ChangeEvent } from 'react';
+import React, { useMemo, useState, ChangeEvent } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../../context/AuthContext';
-import { Search, User } from 'lucide-react';
+import { Search } from 'lucide-react';
+import { AdminStore } from '../../utils/adminStore';
 
 const SupervisorSelection: React.FC = () => {
   const navigate = useNavigate();
   const { user } = useAuth();
   const [searchQuery, setSearchQuery] = useState<string>('');
+  const supervisors = useMemo(() => AdminStore.listSupervisorUsers(), []);
+  const membershipIndex = useMemo(() => {
+    try {
+      const list = JSON.parse(localStorage.getItem('membership_members') || '[]') as Array<{ email:string; membershipNo?: string; name?: string }>;
+      const map = new Map<string, { membershipNo?: string; name?: string }>();
+      list.forEach(m => map.set(m.email, { membershipNo: m.membershipNo, name: m.name }));
+      return map;
+    } catch { return new Map<string, { membershipNo?: string; name?: string }>(); }
+  }, []);
+  const options = useMemo(() => supervisors.map(s => ({
+    id: s.id,
+    name: s.name,
+    email: s.email,
+    membershipNo: membershipIndex.get(s.email)?.membershipNo,
+  })), [supervisors, membershipIndex]);
+  const filtered = useMemo(() => options.filter(o => {
+    const q = searchQuery.toLowerCase();
+    return [o.name, o.email, o.membershipNo].filter(Boolean).some(v => String(v).toLowerCase().includes(q));
+  }), [options, searchQuery]);
+  const [selectedId, setSelectedId] = useState<string>('');
 
   const handleSelect = (): void => {
     if (!user) return;
     const statusKey = `student_supervision_status_${user.email}`;
     const nameKey = `student_supervisor_name_${user.email}`;
+    const target = options.find(o => o.id === (selectedId || (filtered[0]?.id || '')));
+    if (!target) return;
     localStorage.setItem(statusKey, 'pending');
-    localStorage.setItem(nameKey, 'b');
+    localStorage.setItem(nameKey, target.name || target.email);
     localStorage.setItem('student_request_email', user.email);
+    localStorage.setItem(`student_supervisor_email_${user.email}`, target.email);
     navigate('/app/student-logbook');
   };
 
@@ -24,10 +48,10 @@ const SupervisorSelection: React.FC = () => {
 
   return (
     <div className="min-h-screen bg-gray-100 py-12 px-6">
-      <div className="max-w-4xl mx-auto">
+      <div className="max-w-3xl mx-auto">
         <div className="mb-8">
           <h1 className="text-3xl font-semibold text-gray-800 mb-2">Select Your Supervisor</h1>
-          <p className="text-sm text-gray-500">Browse all users and send a supervision request to anyone</p>
+          <p className="text-sm text-gray-500">Search by membership ID or name, then choose from the dropdown.</p>
         </div>
 
         <div className="relative mb-6">
@@ -35,76 +59,36 @@ const SupervisorSelection: React.FC = () => {
           <input
             type="text"
             className="w-full pl-12 pr-4 py-3.5 border-2 border-indigo-500 rounded-lg text-sm bg-white focus:outline-none focus:border-indigo-600 transition-all"
-            placeholder="Search supervisors..."
+            placeholder="Search by membership ID or name..."
             value={searchQuery}
             onChange={handleSearchChange}
           />
         </div>
 
-        <div className="bg-white rounded-xl border border-gray-200 overflow-hidden">
-          <div className="p-5 flex justify-between items-center border-b border-gray-200">
-            <div className="flex items-center gap-4">
-              <div className="w-12 h-12 rounded-full bg-gray-100 border-2 border-gray-200 flex items-center justify-center">
-                <User size={24} color="#6b7280" />
-              </div>
-              <div>
-                <h3 className="text-base font-semibold text-gray-800">b</h3>
-                <p className="text-xs text-gray-500 font-mono">ff5a1bcf-a12f-4901-a2ee-376dab7d20e5</p>
-              </div>
-            </div>
-            <div className="flex items-center gap-4">
-              <span className="text-sm text-gray-500 font-medium">Level 1</span>
-              <button 
-                onClick={handleSelect}
-                className="px-6 py-2 bg-indigo-500 text-white rounded-md text-sm font-medium hover:bg-indigo-600 transition-all"
-              >
-                Select
-              </button>
-            </div>
-          </div>
-        </div>
-        <div className="bg-white rounded-xl border border-gray-200 overflow-hidden">
-          <div className="p-5 flex justify-between items-center border-b border-gray-200">
-            <div className="flex items-center gap-4">
-              <div className="w-12 h-12 rounded-full bg-gray-100 border-2 border-gray-200 flex items-center justify-center">
-                <User size={24} color="#6b7280" />
-              </div>
-              <div>
-                <h3 className="text-base font-semibold text-gray-800">b</h3>
-                <p className="text-xs text-gray-500 font-mono">ff5a1bcf-a12f-4901-a2ee-376dab7d20e5</p>
-              </div>
-            </div>
-            <div className="flex items-center gap-4">
-              <span className="text-sm text-gray-500 font-medium">Level 1</span>
-              <button 
-                onClick={handleSelect}
-                className="px-6 py-2 bg-indigo-500 text-white rounded-md text-sm font-medium hover:bg-indigo-600 transition-all"
-              >
-                Select
-              </button>
-            </div>
-          </div>
-        </div>
-        <div className="bg-white rounded-xl border border-gray-200 overflow-hidden">
-          <div className="p-5 flex justify-between items-center border-b border-gray-200">
-            <div className="flex items-center gap-4">
-              <div className="w-12 h-12 rounded-full bg-gray-100 border-2 border-gray-200 flex items-center justify-center">
-                <User size={24} color="#6b7280" />
-              </div>
-              <div>
-                <h3 className="text-base font-semibold text-gray-800">b</h3>
-                <p className="text-xs text-gray-500 font-mono">ff5a1bcf-a12f-4901-a2ee-376dab7d20e5</p>
-              </div>
-            </div>
-            <div className="flex items-center gap-4">
-              <span className="text-sm text-gray-500 font-medium">Level 1</span>
-              <button 
-                onClick={handleSelect}
-                className="px-6 py-2 bg-indigo-500 text-white rounded-md text-sm font-medium hover:bg-indigo-600 transition-all"
-              >
-                Select
-              </button>
-            </div>
+        <div className="bg-white rounded-xl border border-gray-200 overflow-hidden p-5 space-y-4">
+          <div className="text-xs text-gray-600">Choose Supervisor</div>
+          <select
+            value={selectedId || (filtered[0]?.id || '')}
+            onChange={e=>setSelectedId(e.target.value)}
+            className="w-full px-3 py-2 border rounded-md text-sm bg-white"
+          >
+            {filtered.map(o => (
+              <option key={o.id} value={o.id}>
+                {o.name} {o.membershipNo ? `• ${o.membershipNo}` : ''} • {o.email}
+              </option>
+            ))}
+            {filtered.length===0 && (
+              <option value="" disabled>No supervisors match your search</option>
+            )}
+          </select>
+          <div className="flex justify-end">
+            <button 
+              onClick={handleSelect}
+              className="px-6 py-2 bg-indigo-500 text-white rounded-md text-sm font-medium hover:bg-indigo-600 transition-all"
+              disabled={filtered.length===0}
+            >
+              Select Supervisor
+            </button>
           </div>
         </div>
       </div>

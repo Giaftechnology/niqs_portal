@@ -1,5 +1,6 @@
 import React from 'react';
 import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
+import GlobalAlerts from './components/GlobalAlerts';
 import Login from './pages/Login';
 import StudentDashboard from './pages/StudentDashboard';
 import SupervisorDashboard from './pages/SupervisorDashboard';
@@ -18,6 +19,7 @@ import Accounts from './pages/app/Accounts';
 import StudentLogbook from './pages/app/StudentLogbook';
 import SupervisorLogbook from './pages/app/SupervisorLogbook';
 import HR from './pages/app/HR';
+import SuperviseStudentLog from './pages/app/SuperviseStudentLog';
 import Databank from './pages/app/Databank';
 import SupervisorSelection from './pages/SupervisorSelection';
 import AdminLayout from './layouts/AdminLayout';
@@ -25,6 +27,7 @@ import AdminLogin from './pages/admin/AdminLogin';
 import AdminDashboard from './pages/admin/AdminDashboard';
 import AdminUsers from './pages/admin/Users';
 import StaffDetail from './pages/admin/StaffDetail';
+import AddStaffWizard from './pages/admin/AddStaffWizard';
 import AdminSupervisors from './pages/admin/Supervisors';
 import AdminLogs from './pages/admin/Logs';
 import AdminRoles from './pages/admin/Roles';
@@ -56,11 +59,13 @@ import MembershipStudents from './pages/admin/membership/Students';
 import MembershipMaturedRoutes from './pages/admin/membership/MaturedRoutes';
 import MembershipApplications from './pages/admin/membership/Applications';
 import MembershipMembers from './pages/admin/membership/Members';
+import MembershipProfileView from './pages/admin/membership/ProfileView';
 
 const App: React.FC = () => {
   return (
     <AuthProvider>
       <Router>
+        <GlobalAlerts />
         <Routes>
           <Route path="/" element={<Navigate to="/login" replace />} />
           <Route path="/login" element={<Login />} />
@@ -72,6 +77,7 @@ const App: React.FC = () => {
           <Route path="/admin" element={<RequireAdmin><AdminLayout /></RequireAdmin>}>
             <Route index element={<AdminDashboard />} />
             <Route path="users" element={<AdminUsers />} />
+            <Route path="users/add" element={<AddStaffWizard />} />
             <Route path="users/:id" element={<StaffDetail />} />
             <Route path="profile" element={<AdminProfile />} />
             <Route path="supervisors" element={<AdminSupervisors />} />
@@ -100,6 +106,7 @@ const App: React.FC = () => {
             <Route path="membership/matured-routes" element={<MembershipMaturedRoutes />} />
             <Route path="membership/applications" element={<MembershipApplications />} />
             <Route path="membership/members" element={<MembershipMembers />} />
+            <Route path="membership/profile/:email" element={<MembershipProfileView />} />
             {/* Logbook group */}
             <Route path="logbook/supervisors" element={<AdminSupervisors />} />
             <Route path="logbook/accessors" element={<AdminAccessors />} />
@@ -117,7 +124,8 @@ const App: React.FC = () => {
             <Route path="exams" element={<Exams />} />
             <Route path="accounts" element={<Accounts />} />
             <Route path="student-logbook" element={<RequireProfile><StudentDashboard /></RequireProfile>} />
-            <Route path="supervisor-logbook" element={<RequireProfile><SupervisorDashboard /></RequireProfile>} />
+            <Route path="supervisor-logbook" element={<RequireProfile><SupervisorLogbook /></RequireProfile>} />
+            <Route path="supervised-logbook/:email" element={<RequireProfile><SuperviseStudentLog /></RequireProfile>} />
             <Route path="accessor-logbook" element={<RequireProfile><SupervisorLogbook /></RequireProfile>} />
             <Route path="supervisor-selection" element={<SupervisorSelection />} />
             <Route path="hr" element={<HR />} />

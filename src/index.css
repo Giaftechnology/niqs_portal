@@ -3,7 +3,6 @@
 @tailwind utilities;
 
 @layer base {
-<<<<<<< HEAD
   * {
     @apply box-border m-0 p-0;
   }
@@ -17,9 +16,5 @@
   }
   code {
     font-family: source-code-pro, Menlo, Monaco, Consolas, 'Courier New', monospace;
-=======
-  body {
-    @apply bg-gray-100 antialiased;
->>>>>>> 7b8e512 (feat: migrate to Tailwind CSS and update UI styling with gradients)
   }
 }

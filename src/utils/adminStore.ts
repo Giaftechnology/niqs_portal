@@ -1,4 +1,4 @@
-import { AdminLogEntry, AdminUser, SupervisorProfile } from '../types/admin';
+import { AdminActivity, AdminLogEntry, AdminUser, SupervisorProfile, StaffProfile } from '../types/admin';
 
 const USERS_KEY = 'admin_users_v1';
 const SUPS_KEY = 'admin_supervisors_v1';
@@ -8,11 +8,14 @@ const ACTIONS_KEY = 'admin_actions_v1';
 const ROLES_KEY = 'admin_roles_v1';
 const ACCESSORS_KEY = 'admin_accessors_v1';
 const DIETS_KEY = 'admin_diets_v1';
+const DIET_ASSIGN_KEY = 'diet_assignments_v1';
 const EXAMS_KEY = 'admin_exams_v1';
 const EVENTS_KEY = 'admin_events_v1';
 const VENDORS_KEY = 'admin_vendors_v1';
 const REQS_KEY = 'admin_requisitions_v1';
 const POS_KEY = 'admin_purchase_orders_v1';
+const STAFFS_KEY = 'admin_staff_profiles_v1';
+const ACTIVITY_KEY = 'admin_activities_v1';
 
 const id = () => Math.random().toString(36).slice(2, 10);
 
@@ -143,7 +146,62 @@ export const AdminStore = {
       ];
       localStorage.setItem(POS_KEY, JSON.stringify(pos));
     }
+    // Activities seed (system actions demo)
+    if (!localStorage.getItem(ACTIVITY_KEY)) {
+      const now = Date.now();
+      const acts: AdminActivity[] = [
+        { id: id(), userEmail: 'admin@niqs.org', message: 'Signed in to admin portal', createdAt: now - 86400000 * 2 },
+        { id: id(), userEmail: 'admin@niqs.org', message: 'Approved a student logbook entry (Week 1 - Tuesday)', createdAt: now - 86400000 },
+        { id: id(), userEmail: 'student1@niqs.org', message: 'Signed up to the portal', createdAt: now - 3600000 * 5 },
+        { id: id(), userEmail: 'student1@niqs.org', message: 'Submitted a daily log (Week 1 - Monday)', createdAt: now - 3600000 * 4 },
+        { id: id(), userEmail: 'super1@niqs.org', message: 'Approved a daily log for student1@niqs.org', createdAt: now - 3600000 * 3 },
+      ];
+      localStorage.setItem(ACTIVITY_KEY, JSON.stringify(acts));
+    }
   },
+  // Staff Profiles (detailed HR records)
+  listStaffProfiles(): StaffProfile[] {
+    try { return JSON.parse(localStorage.getItem(STAFFS_KEY) || '[]'); } catch { return []; }
+  },
+  saveStaffProfiles(list: StaffProfile[]) {
+    localStorage.setItem(STAFFS_KEY, JSON.stringify(list));
+  },
+  createStaffProfile(data: Omit<StaffProfile, 'id'|'createdAt'>): StaffProfile {
+    const list = this.listStaffProfiles();
+    const profile: StaffProfile = { id: id(), createdAt: new Date().toISOString(), ...data };
+    list.push(profile);
+    this.saveStaffProfiles(list);
+    // ensure the staff exists in Users listing for access control
+    const fullName = [profile.firstName, profile.middleName, profile.lastName].filter(Boolean).join(' ').trim();
+    const users = this.listUsers();
+    if (!users.find(u => u.email.toLowerCase() === profile.emailAddress.toLowerCase())) {
+      const u: AdminUser = { id: id(), email: profile.emailAddress, name: fullName || profile.emailAddress, role: '-', active: true };
+      this.saveUsers([...users, u]);
+    }
+    return profile;
+  },
+  updateStaffProfile(item: StaffProfile) {
+    const list = this.listStaffProfiles().map(x=>x.id===item.id?item:x);
+    this.saveStaffProfiles(list);
+  },
+  deleteStaffProfile(idStr: string) {
+    this.saveStaffProfiles(this.listStaffProfiles().filter(x=>x.id!==idStr));
+  },
+  // System activities (lightweight event feed)
+  listActivities(): AdminActivity[] {
+    try { return JSON.parse(localStorage.getItem(ACTIVITY_KEY) || '[]'); } catch { return []; }
+  },
+  saveActivities(list: AdminActivity[]) {
+    localStorage.setItem(ACTIVITY_KEY, JSON.stringify(list));
+  },
+  addActivity(entry: { userEmail: string; message: string }) {
+    const list = this.listActivities();
+    const rec: AdminActivity = { id: id(), createdAt: Date.now(), ...entry };
+    list.push(rec);
+    this.saveActivities(list);
+    return rec;
+  },
+  
   // Convenience for tests: seed membership datasets if missing
   seedMembership() {
     if (!localStorage.getItem('membership_members')) {
@@ -442,6 +500,67 @@ export const AdminStore = {
     if (idx<0) return;
     diets[idx].status = status;
     this.saveDiets(diets);
+  },
+
+  // Diet student assignments to accessors
+  listDietAssignments(): Record<string, Record<string, string[]>> {
+    try { return JSON.parse(localStorage.getItem(DIET_ASSIGN_KEY) || '{}'); } catch { return {}; }
+  },
+  saveDietAssignments(map: Record<string, Record<string, string[]>>) {
+    localStorage.setItem(DIET_ASSIGN_KEY, JSON.stringify(map));
+  },
+  getDietAssignmentsFor(dietId: string): Record<string, string[]> {
+    const all = this.listDietAssignments();
+    return all[dietId] || {};
+  },
+  assignmentCountForAccessor(dietId: string, accessorId: string): number {
+    const map = this.getDietAssignmentsFor(dietId);
+    return (map[accessorId] || []).length;
+  },
+  distributeDietStudents(dietId: string) {
+    const diets = this.listDiets();
+    const diet = diets.find(d=>d.id===dietId);
+    if (!diet) return;
+    const accessors = diet.accessorIds;
+    if (!accessors || accessors.length === 0) return;
+    const students = Array.from(new Set(this.listLogs().filter(l=>l.dietId===dietId).map(l=>l.studentEmail)));
+    const all = this.listDietAssignments();
+    const mapping: Record<string, string[]> = {};
+    accessors.forEach(aid => { mapping[aid] = []; });
+    if (students.length > 0) {
+      students.forEach((email, i) => {
+        const idx = i % accessors.length;
+        mapping[accessors[idx]].push(email);
+      });
+    }
+    all[dietId] = mapping;
+    this.saveDietAssignments(all);
+  },
+  redistributeFromAccessor(dietId: string, fromAccessorId: string, count: number) {
+    const diets = this.listDiets();
+    const diet = diets.find(d=>d.id===dietId);
+    if (!diet) return;
+    const accessors = diet.accessorIds.filter(id=>id!==fromAccessorId);
+    if (accessors.length === 0) return;
+    const all = this.listDietAssignments();
+    const map: Record<string, string[]> = all[dietId] || {};
+    if (!map[fromAccessorId]) return;
+    const fromList = map[fromAccessorId];
+    const take = Math.max(0, Math.min(count, fromList.length));
+    if (take === 0) return;
+    const moving = fromList.splice(-take, take);
+    // Greedy distribute to the least-loaded accessor each time
+    moving.forEach(student => {
+      let target = accessors[0];
+      let min = Number.MAX_SAFE_INTEGER;
+      for (const aid of accessors) {
+        const len = (map[aid] || (map[aid]=[])).length;
+        if (len < min) { min = len; target = aid; }
+      }
+      (map[target] ||= []).push(student);
+    });
+    all[dietId] = map;
+    this.saveDietAssignments(all);
   },
 
   // Exams

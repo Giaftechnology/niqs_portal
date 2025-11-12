@@ -1,8 +1,10 @@
-import React, { useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import Modal from '../../components/Modal';
 import { AdminStore } from '../../utils/adminStore';
 import { AdminLogEntry } from '../../types/admin';
+
+const days: Array<'Monday'|'Tuesday'|'Wednesday'|'Thursday'|'Friday'> = ['Monday','Tuesday','Wednesday','Thursday','Friday'];
 
 const SubmissionDetail: React.FC = () => {
   const { id: dietId, sid } = useParams();
@@ -13,6 +15,20 @@ const SubmissionDetail: React.FC = () => {
   const submission = useMemo(() => (AdminStore.listLogs().find(l => l.id === sid) as AdminLogEntry|undefined), [sid]);
   const accessors = useMemo(() => diet ? AdminStore.listAccessors().filter(a=>diet.accessorIds.includes(a.id)) : [], [diet]);
   const studentLogs = useMemo(() => submission ? AdminStore.listLogs().filter(l => l.studentEmail === submission.studentEmail && (!dietId || l.dietId === dietId)) : [], [submission, dietId]);
+  const approvedLogs = useMemo(() => studentLogs.filter(l=>l.status==='approved'), [studentLogs]);
+  const approvedWeeks = useMemo(() => Array.from(new Set(approvedLogs.map(l=>l.week))).sort((a,b)=>a-b), [approvedLogs]);
+  const [selectedWeek, setSelectedWeek] = useState<number>(1);
+  const [approvedByDay, setApprovedByDay] = useState<Record<string, string>>({});
+
+  useEffect(() => {
+    if (approvedWeeks.length > 0) setSelectedWeek(approvedWeeks[0]);
+  }, [approvedWeeks.join(',')]);
+
+  useEffect(() => {
+    const next: Record<string, string> = { Monday:'', Tuesday:'', Wednesday:'', Thursday:'', Friday:'' };
+    approvedLogs.filter(l=>l.week===selectedWeek).forEach(l => { next[l.day] = l.text; });
+    setApprovedByDay(next);
+  }, [approvedLogs, selectedWeek]);
 
   const updateStatus = (s: 'approved'|'rejected'|'pending') => {
     if (!submission) return;
@@ -57,6 +73,26 @@ const SubmissionDetail: React.FC = () => {
           </div>
           <div className="text-xs text-gray-500">Text</div>
           <div className="whitespace-pre-wrap text-sm">{submission.text}</div>
+        </div>
+      </section>
+
+      <section className="bg-white border rounded-xl">
+        <div className="p-3 text-sm font-medium border-b flex items-center gap-3">
+          <span>Approved Logbook (by week)</span>
+          <div className="ml-auto flex items-center gap-2">
+            <label className="text-xs text-gray-600">Week</label>
+            <select value={selectedWeek} onChange={e=>setSelectedWeek(Number(e.target.value))} className="px-2 py-1 border rounded text-xs">
+              {approvedWeeks.length===0 ? <option value={1}>Week 1</option> : approvedWeeks.map(w => (<option key={w} value={w}>Week {w}</option>))}
+            </select>
+          </div>
+        </div>
+        <div className="p-4 grid grid-cols-1 md:grid-cols-2 gap-3 text-sm">
+          {days.map(d => (
+            <div key={d} className="border rounded p-3">
+              <div className="text-xs text-gray-500 mb-1">{d}</div>
+              <div className="whitespace-pre-wrap min-h-[64px]">{approvedByDay[d] || '— (No approved entry)'}</div>
+            </div>
+          ))}
         </div>
       </section>
 

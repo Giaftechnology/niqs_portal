@@ -1,6 +1,7 @@
 import React, { useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { AdminStore } from '../../utils/adminStore';
+import { emitAlert } from '../../utils/alerts';
 import { AdminUser, AdminUserRole } from '../../types/admin';
 import Modal from '../../components/Modal';
 
@@ -31,19 +32,31 @@ const UsersPage: React.FC = () => {
     if (!editing) return;
     AdminStore.updateUser({ ...editing, ...draft } as AdminUser);
     setItems(AdminStore.listUsers());
+    const name = (draft.name || editing.name || draft.email || editing.email);
+    AdminStore.addActivity({ userEmail: editing.email, message: `${name} profile updated` });
     setEditing(null);
     setDraft(empty);
     setFormOpen(false);
+    emitAlert('Staff updated successfully', 'Update Staff');
   };
 
   const remove = (id: string) => {
+    const target = items.find(i=>i.id===id);
     AdminStore.deleteUser(id);
     setItems(AdminStore.listUsers());
+    if (target) {
+      const name = target.name || target.email;
+      AdminStore.addActivity({ userEmail: target.email, message: `${name} account deleted` });
+    }
+    emitAlert('Staff deleted successfully', 'Delete Staff');
   };
 
   const toggleSuspend = (u: AdminUser) => {
     AdminStore.updateUser({ ...u, active: !u.active });
     setItems(AdminStore.listUsers());
+    const name = u.name || u.email;
+    AdminStore.addActivity({ userEmail: u.email, message: `${name} ${u.active ? 'suspended' : 're-activated'}` });
+    emitAlert(u.active ? 'Staff suspended' : 'Staff unsuspended', 'Status Updated');
   };
 
   const openView = (u: AdminUser) => {
@@ -69,7 +82,7 @@ const UsersPage: React.FC = () => {
       </div>
 
       <div className="flex justify-end">
-        <button onClick={()=>{ setEditing(null); setDraft(empty); setFormOpen(true); }} className="px-3 py-2 bg-indigo-600 text-white rounded-md text-sm">+ Add Staff</button>
+        <button onClick={()=>{ navigate('/admin/users/add'); }} className="px-3 py-2 bg-indigo-600 text-white rounded-md text-sm">+ Add Staff</button>
       </div>
 
       <div className="bg-white border border-gray-200 rounded-xl">
@@ -91,10 +104,30 @@ const UsersPage: React.FC = () => {
                 <td className="p-3 capitalize">{u.role}</td>
                 <td className="p-3">{u.active ? 'Yes' : 'No'}</td>
                 <td className="p-3 flex gap-2 justify-end">
-                  <button onClick={() => openView(u)} className="px-3 py-1.5 border rounded-md">View</button>
-                  <button onClick={() => startEdit(u)} className="px-3 py-1.5 border rounded-md">Edit</button>
-                  <button onClick={() => toggleSuspend(u)} className="px-3 py-1.5 border rounded-md">{u.active?'Suspend':'Unsuspend'}</button>
-                  <button onClick={() => remove(u.id)} className="px-3 py-1.5 border rounded-md">Delete</button>
+                  <button
+                    onClick={() => openView(u)}
+                    className="px-3 py-1.5 border rounded-md text-sm bg-blue-50 text-blue-700 border-blue-200 hover:bg-blue-100"
+                  >
+                    View
+                  </button>
+                  <button
+                    onClick={() => startEdit(u)}
+                    className="px-3 py-1.5 border rounded-md text-sm bg-amber-50 text-amber-700 border-amber-200 hover:bg-amber-100"
+                  >
+                    Edit
+                  </button>
+                  <button
+                    onClick={() => toggleSuspend(u)}
+                    className={`px-3 py-1.5 border rounded-md text-sm ${u.active ? 'bg-orange-50 text-orange-700 border-orange-200 hover:bg-orange-100' : 'bg-green-50 text-green-700 border-green-200 hover:bg-green-100'}`}
+                  >
+                    {u.active ? 'Suspend' : 'Unsuspend'}
+                  </button>
+                  <button
+                    onClick={() => remove(u.id)}
+                    className="px-3 py-1.5 border rounded-md text-sm bg-red-50 text-red-700 border-red-200 hover:bg-red-100"
+                  >
+                    Delete
+                  </button>
                 </td>
               </tr>
             ))}

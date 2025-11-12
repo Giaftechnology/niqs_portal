@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { LogOut, Eye, Check, X } from 'lucide-react';
 
@@ -18,7 +18,7 @@ const SupervisorDashboard: React.FC = () => {
   };
 
   const handleViewLogbook = (): void => {
-    navigate('/new-student-entry');
+    navigate('/app/supervisor-logbook');
   };
 
   const handleApprove = (): void => {

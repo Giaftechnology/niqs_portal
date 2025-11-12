@@ -1,11 +1,13 @@
 import React, { useMemo, useState } from 'react';
 import Modal from '../../../components/Modal';
+import { useNavigate } from 'react-router-dom';
 
 const KEY = 'membership_students';
 const getAll = () => JSON.parse(localStorage.getItem(KEY) || '[]') as Array<{ id:string; email:string; name:string; phone?:string; department?:string }>;
 
 const MembershipStudents: React.FC = () => {
   const [items, setItems] = useState(getAll());
+  const navigate = useNavigate();
   const [q, setQ] = useState('');
   const [view, setView] = useState<{open:boolean; title:string; body?:React.ReactNode}>({open:false, title:''});
 
@@ -40,7 +42,7 @@ const MembershipStudents: React.FC = () => {
               <tr key={it.id} className="border-t">
                 <td className="p-3">{it.name}</td>
                 <td className="p-3">{it.email}</td>
-                <td className="p-3"><button onClick={()=>openView(it)} className="px-2 py-1 text-xs border rounded">View</button></td>
+                <td className="p-3"><button onClick={()=>navigate(`/admin/membership/profile/${encodeURIComponent(it.email)}`)} className="px-2 py-1 text-xs border rounded">View</button></td>
               </tr>
             ))}
           </tbody>
