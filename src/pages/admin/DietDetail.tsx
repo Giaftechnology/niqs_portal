@@ -2,6 +2,7 @@ import React, { useMemo, useState, useEffect } from 'react';
 import { Link, useNavigate, useParams } from 'react-router-dom';
 import Modal from '../../components/Modal';
 import { AdminStore } from '../../utils/adminStore';
+import StatusPill from '../../components/StatusPill';
 
 const AdminDietDetail: React.FC = () => {
   const { id } = useParams();
@@ -182,7 +183,7 @@ const AdminDietDetail: React.FC = () => {
                   <td className="p-2">{s.studentEmail}</td>
                   <td className="p-2">W{s.week} / {s.day}</td>
                   <td className="p-2">
-                    <span className={`px-2 py-0.5 rounded text-xs ${s.status==='submitted' ? 'bg-green-100 text-green-700' : s.status==='approved' ? 'bg-blue-100 text-blue-700' : s.status==='rejected' ? 'bg-red-100 text-red-700' : 'bg-yellow-100 text-yellow-700'}`}>{s.status}</span>
+                    <StatusPill status={s.status as any} />
                   </td>
                   <td className="p-2 space-x-2">
                     <button onClick={()=>{ AdminStore.updateLog({ ...s, status: 'pending' as any }); }} className="px-2 py-1 text-xs border rounded">Recall Submission</button>

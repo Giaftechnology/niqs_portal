@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../../context/AuthContext';
 import { Search } from 'lucide-react';
 import { AdminStore } from '../../utils/adminStore';
+import { supervisionStatusKey, supervisorNameKey, STUDENT_REQUEST_EMAIL_KEY, supervisorEmailKey } from '../../utils/logbook';
 
 const SupervisorSelection: React.FC = () => {
   const navigate = useNavigate();
@@ -31,14 +32,12 @@ const SupervisorSelection: React.FC = () => {
 
   const handleSelect = (): void => {
     if (!user) return;
-    const statusKey = `student_supervision_status_${user.email}`;
-    const nameKey = `student_supervisor_name_${user.email}`;
     const target = options.find(o => o.id === (selectedId || (filtered[0]?.id || '')));
     if (!target) return;
-    localStorage.setItem(statusKey, 'pending');
-    localStorage.setItem(nameKey, target.name || target.email);
-    localStorage.setItem('student_request_email', user.email);
-    localStorage.setItem(`student_supervisor_email_${user.email}`, target.email);
+    localStorage.setItem(supervisionStatusKey(user.email), 'pending');
+    localStorage.setItem(supervisorNameKey(user.email), target.name || target.email);
+    localStorage.setItem(STUDENT_REQUEST_EMAIL_KEY, user.email);
+    localStorage.setItem(supervisorEmailKey(user.email), target.email);
     navigate('/app/student-logbook');
   };
 

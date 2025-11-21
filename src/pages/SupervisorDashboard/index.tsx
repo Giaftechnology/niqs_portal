@@ -1,6 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { LogOut, Eye, Check, X } from 'lucide-react';
+import { entriesKey, supervisionStatusKey, STUDENT_REQUEST_EMAIL_KEY } from '../../utils/logbook';
 
 type TabType = 'supervision' | 'approval' | 'supervise' | 'rejected';
 
@@ -9,9 +10,7 @@ const SupervisorDashboard: React.FC = () => {
   const [activeTab, setActiveTab] = useState<TabType>('supervision');
   const [supervisionStatus, setSupervisionStatus] = useState<string | null>(null);
   const [supervisorQueue, setSupervisorQueue] = useState<Array<{ week: number; day: string; text: string; status: string }>>([]);
-  const studentEmail = localStorage.getItem('student_request_email') || '';
-  const statusKey = (email: string) => `student_supervision_status_${email}`;
-  const entriesKey = (email: string, week: number) => `student_entries_${email}_week_${week}`;
+  const studentEmail = localStorage.getItem(STUDENT_REQUEST_EMAIL_KEY) || '';
 
   const handleLogout = (): void => {
     navigate('/login');
@@ -23,19 +22,19 @@ const SupervisorDashboard: React.FC = () => {
 
   const handleApprove = (): void => {
     if (!studentEmail) return;
-    localStorage.setItem(statusKey(studentEmail), 'approved');
+    localStorage.setItem(supervisionStatusKey(studentEmail), 'approved');
     navigate('/app/student-logbook');
   };
 
   const handleReject = (): void => {
     if (!studentEmail) return;
-    localStorage.setItem(statusKey(studentEmail), 'rejected');
+    localStorage.setItem(supervisionStatusKey(studentEmail), 'rejected');
     navigate('/app/student-logbook');
   };
 
   // Load data for tabs
   useEffect(() => {
-    const stat = studentEmail ? localStorage.getItem(statusKey(studentEmail)) : null;
+    const stat = studentEmail ? localStorage.getItem(supervisionStatusKey(studentEmail)) : null;
     setSupervisionStatus(stat);
     // Build approval queue from submitted entries (all weeks)
     const queue: Array<{ week: number; day: string; text: string; status: string }> = [];

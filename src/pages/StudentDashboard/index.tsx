@@ -3,20 +3,22 @@ import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../../context/AuthContext';
 import { BookOpen, LogOut, TrendingUp } from 'lucide-react';
 import Modal from '../../components/Modal';
+import WeekDropdown from '../../components/WeekDropdown';
+import { Day, DAYS, entriesKey, WEEKS, supervisionStatusKey, supervisorNameKey } from '../../utils/logbook';
+import { useLocalStorage } from '../../hooks/useLocalStorage';
 
 type SupervisionStatus = 'none' | 'pending' | 'rejected' | 'approved';
-
-const statusKey = (email: string) => `student_supervision_status_${email}`;
-const supervisorNameKey = (email: string) => `student_supervisor_name_${email}`;
-const entriesKey = (email: string, week: number) => `student_entries_${email}_week_${week}`;
 
 const StudentDashboard: React.FC = () => {
   const navigate = useNavigate();
   const { user } = useAuth();
-  const [status, setStatus] = useState<SupervisionStatus>('none');
-  const [selectedWeek, setSelectedWeek] = useState<number>(1);
-  const [supervisorName, setSupervisorName] = useState<string | null>(null);
-  const [dailyText, setDailyText] = useState<Record<string, string>>({
+  const statusKey = useMemo(() => (user?.email ? supervisionStatusKey(user.email) : '__noop__'), [user?.email]);
+  const supervisorNameKeyMemo = useMemo(() => (user?.email ? supervisorNameKey(user.email) : '__noop__'), [user?.email]);
+  const selectedWeekKey = useMemo(() => (user?.email ? `student_selected_week_${user.email}` : '__noop__'), [user?.email]);
+  const [status, setStatus] = useLocalStorage<SupervisionStatus>(statusKey, 'none');
+  const [selectedWeek, setSelectedWeek] = useLocalStorage<number>(selectedWeekKey, 1);
+  const [supervisorName] = useLocalStorage<string>(supervisorNameKeyMemo, '');
+  const [dailyText, setDailyText] = useState<Record<Day, string>>({
     Monday: '',
     Tuesday: '',
     Wednesday: '',
@@ -27,18 +29,7 @@ const StudentDashboard: React.FC = () => {
   const [weeksCompleted, setWeeksCompleted] = useState<number>(0);
   const [modal, setModal] = useState<{ open: boolean; title: string; message?: string }>({ open: false, title: '' });
 
-  useEffect(() => {
-    if (!user) return;
-    const saved = (localStorage.getItem(statusKey(user.email)) as SupervisionStatus | null) ?? 'none';
-    setStatus(saved);
-    setSupervisorName(localStorage.getItem(supervisorNameKey(user.email)));
-  }, [user]);
-
-  const saveStatus = (next: SupervisionStatus) => {
-    if (!user) return;
-    localStorage.setItem(statusKey(user.email), next);
-    setStatus(next);
-  };
+  // status persisted via useLocalStorage
 
   const handleSignOut = (): void => {
     navigate('/login');
@@ -48,7 +39,7 @@ const StudentDashboard: React.FC = () => {
     navigate('/app/supervisor-selection');
   };
 
-  const weeks = useMemo(() => Array.from({ length: 52 }, (_, i) => i + 1), []);
+  const weeks = useMemo(() => WEEKS, []);
 
   useEffect(() => {
     // load existing entries for selected week
@@ -56,8 +47,8 @@ const StudentDashboard: React.FC = () => {
     const raw = localStorage.getItem(entriesKey(user.email, selectedWeek));
     if (raw) {
       try {
-        const parsed = JSON.parse(raw) as Array<{ day: string; text: string; status: string }>;
-        const next: Record<string, string> = { Monday: '', Tuesday: '', Wednesday: '', Thursday: '', Friday: '' };
+        const parsed = JSON.parse(raw) as Array<{ day: Day; text: string; status: string }>;
+        const next: Record<Day, string> = { Monday: '', Tuesday: '', Wednesday: '', Thursday: '', Friday: '' };
         parsed.forEach((e) => (next[e.day] = e.text));
         setDailyText(next);
       } catch {}
@@ -82,11 +73,11 @@ const StudentDashboard: React.FC = () => {
     setWeeksCompleted(completed);
   }, [selectedWeek, status, user]);
 
-  const handleSaveDay = (day: string) => {
+  const handleSaveDay = (day: Day) => {
     if (!user) return;
     const k = entriesKey(user.email, selectedWeek);
     const raw = localStorage.getItem(k);
-    let items: Array<{ day: string; text: string; status: string }>= [];
+    let items: Array<{ day: Day; text: string; status: string }>= [];
     if (raw) {
       try { items = JSON.parse(raw); } catch {}
     }
@@ -161,7 +152,7 @@ const StudentDashboard: React.FC = () => {
                 </>
               )}
               {status === 'approved' && (
-                <span className="inline-flex items-center px-3 py-1 text-xs rounded-md bg-emerald-50 text-emerald-700 border border-emerald-200">Approved by {supervisorName ?? 'Supervisor'}</span>
+                <span className="inline-flex items-center px-3 py-1 text-xs rounded-md bg-emerald-50 text-emerald-700 border border-emerald-200">Approved by {supervisorName || 'Supervisor'}</span>
               )}
             </div>
           )}
@@ -205,21 +196,13 @@ const StudentDashboard: React.FC = () => {
             <div className="space-y-6">
               <div className="bg-white border border-gray-200 rounded-xl p-6">
                 <h2 className="text-sm font-semibold text-gray-800 mb-3">Select Week</h2>
-                <select
-                  value={selectedWeek}
-                  onChange={(e) => setSelectedWeek(parseInt(e.target.value))}
-                  className="px-4 py-2 border border-gray-200 rounded-md text-sm bg-white"
-                >
-                  {weeks.map((w) => (
-                    <option key={w} value={w}>Week {w}</option>
-                  ))}
-                </select>
+                <WeekDropdown value={selectedWeek} onChange={setSelectedWeek} weeks={weeks} size="md" />
               </div>
 
               <div className="bg-white border border-gray-200 rounded-xl p-6">
                 <h2 className="text-sm font-semibold text-gray-800 mb-4">Week {selectedWeek} - Daily Entries</h2>
                 <div className="space-y-4">
-                  {(['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday'] as const).map((day) => (
+                  {DAYS.map((day) => (
                     <div key={day} className="p-3 rounded-lg bg-gray-50">
                       <label className="block text-xs font-medium text-gray-600 mb-2">{day}</label>
                       <textarea

@@ -3,8 +3,9 @@ import { useNavigate, useParams } from 'react-router-dom';
 import Modal from '../../components/Modal';
 import { AdminStore } from '../../utils/adminStore';
 import { AdminLogEntry } from '../../types/admin';
-
-const days: Array<'Monday'|'Tuesday'|'Wednesday'|'Thursday'|'Friday'> = ['Monday','Tuesday','Wednesday','Thursday','Friday'];
+import StatusPill from '../../components/StatusPill';
+import WeekDropdown from '../../components/WeekDropdown';
+import DayGrid from '../../components/DayGrid';
 
 const SubmissionDetail: React.FC = () => {
   const { id: dietId, sid } = useParams();
@@ -68,9 +69,7 @@ const SubmissionDetail: React.FC = () => {
         <div className="p-3 text-sm font-medium border-b">Entry</div>
         <div className="p-4 space-y-2">
           <div className="text-xs text-gray-500">Status</div>
-          <div>
-            <span className={`px-2 py-0.5 rounded text-xs ${submission.status==='submitted' ? 'bg-green-100 text-green-700' : submission.status==='approved' ? 'bg-blue-100 text-blue-700' : submission.status==='rejected' ? 'bg-red-100 text-red-700' : 'bg-yellow-100 text-yellow-700'}`}>{submission.status}</span>
-          </div>
+          <div><StatusPill status={submission.status as any} /></div>
           <div className="text-xs text-gray-500">Text</div>
           <div className="whitespace-pre-wrap text-sm">{submission.text}</div>
         </div>
@@ -79,20 +78,10 @@ const SubmissionDetail: React.FC = () => {
       <section className="bg-white border rounded-xl">
         <div className="p-3 text-sm font-medium border-b flex items-center gap-3">
           <span>Approved Logbook (by week)</span>
-          <div className="ml-auto flex items-center gap-2">
-            <label className="text-xs text-gray-600">Week</label>
-            <select value={selectedWeek} onChange={e=>setSelectedWeek(Number(e.target.value))} className="px-2 py-1 border rounded text-xs">
-              {approvedWeeks.length===0 ? <option value={1}>Week 1</option> : approvedWeeks.map(w => (<option key={w} value={w}>Week {w}</option>))}
-            </select>
-          </div>
+          <div className="ml-auto"><WeekDropdown value={selectedWeek} onChange={setSelectedWeek} weeks={approvedWeeks.length?approvedWeeks:[1]} size="sm" /></div>
         </div>
-        <div className="p-4 grid grid-cols-1 md:grid-cols-2 gap-3 text-sm">
-          {days.map(d => (
-            <div key={d} className="border rounded p-3">
-              <div className="text-xs text-gray-500 mb-1">{d}</div>
-              <div className="whitespace-pre-wrap min-h-[64px]">{approvedByDay[d] || '— (No approved entry)'}</div>
-            </div>
-          ))}
+        <div className="p-4">
+          <DayGrid values={approvedByDay as any} placeholder="— (No approved entry)" />
         </div>
       </section>
 
@@ -124,7 +113,7 @@ const SubmissionDetail: React.FC = () => {
               {studentLogs.map(l => (
                 <tr key={l.id} className="border-t">
                   <td className="p-2">W{l.week} / {l.day}</td>
-                  <td className="p-2"><span className={`px-2 py-0.5 rounded text-xs ${l.status==='submitted' ? 'bg-green-100 text-green-700' : l.status==='approved' ? 'bg-blue-100 text-blue-700' : l.status==='rejected' ? 'bg-red-100 text-red-700' : 'bg-yellow-100 text-yellow-700'}`}>{l.status}</span></td>
+                  <td className="p-2"><StatusPill status={l.status as any} /></td>
                   <td className="p-2">{l.text.slice(0,100)}{l.text.length>100?'…':''}</td>
                 </tr>
               ))}

@@ -140,7 +140,15 @@ const Dropzone = ({ label, onSelect, accept, preview, rounded=false }: { label: 
       </label>
       {preview && (
         <div className="mt-3">
-          <img src={preview} alt={label} className={`${rounded ? 'rounded-full h-24 w-24' : ''} ${!rounded ? 'h-20' : ''} object-cover border`} />
+          {String(preview).startsWith('data:image') ? (
+            <img src={preview} alt={label} className={`${rounded ? 'rounded-full h-24 w-24' : ''} ${!rounded ? 'h-20' : ''} object-cover border`} />
+          ) : (
+            <div className="flex items-center gap-3 text-xs">
+              <span className="px-2 py-1 border rounded bg-gray-50 text-gray-700">File uploaded</span>
+              <a href={preview} target="_blank" rel="noreferrer" className="text-indigo-600 underline">View</a>
+              <a href={preview} download className="text-indigo-600 underline">Download</a>
+            </div>
+          )}
         </div>
       )}
     </div>
@@ -366,7 +374,7 @@ const Onboarding: React.FC = () => {
                     {years.map(y => (<option key={y}>{y}</option>))}
                   </Select>
                   <div>
-                    <Dropzone label="Certificate File" onSelect={(f) => onFile(f, 'certificate_file', 'academics', i)} />
+                    <Dropzone label="Certificate File" accept="image/*,application/pdf" onSelect={(f) => onFile(f, 'certificate_file', 'academics', i)} preview={state.academics[i].certificate_file} />
                   </div>
                   {state.academics.length > 1 && (
                     <div>
@@ -433,7 +441,7 @@ const Onboarding: React.FC = () => {
                   <Input label="Organization Name" value={p.organization_name} onChange={(e: any) => setState((s) => { const arr = [...s.profcerts]; arr[i].organization_name = e.target.value; return { ...s, profcerts: arr }; })} />
                   <Input label="Exam Passed" value={p.exam_passed} onChange={(e: any) => setState((s) => { const arr = [...s.profcerts]; arr[i].exam_passed = e.target.value; return { ...s, profcerts: arr }; })} />
                   <div>
-                    <Dropzone label="Certificate File" onSelect={(f) => onFile(f, 'certificate_file', 'profcerts', i)} />
+                    <Dropzone label="Certificate File" accept="image/*,application/pdf" onSelect={(f) => onFile(f, 'certificate_file', 'profcerts', i)} preview={state.profcerts[i].certificate_file} />
                   </div>
                   {state.profcerts.length > 1 && (
                     <div>

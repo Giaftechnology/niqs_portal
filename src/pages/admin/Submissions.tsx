@@ -1,6 +1,7 @@
 import React, { useMemo, useState } from 'react';
 import Modal from '../../components/Modal';
 import { AdminStore } from '../../utils/adminStore';
+import StatusPill from '../../components/StatusPill';
 
 const AdminSubmissions: React.FC = () => {
   const [q, setQ] = useState('');
@@ -58,7 +59,7 @@ const AdminSubmissions: React.FC = () => {
                 <td className="p-3">W{s.week} / {s.day}</td>
                 <td className="p-3">{s.text.length>60? s.text.slice(0,60)+'…' : s.text}</td>
                 <td className="p-3">
-                  <span className={`px-2 py-0.5 rounded text-xs ${s.status==='approved'?'bg-green-100 text-green-700': s.status==='rejected'?'bg-red-100 text-red-700':'bg-yellow-100 text-yellow-700'}`}>{s.status}</span>
+                  <StatusPill status={s.status as any} />
                 </td>
                 <td className="p-3 space-x-2">
                   <button onClick={()=>openView(s.id)} className="px-2 py-1 text-xs border rounded">View</button>
