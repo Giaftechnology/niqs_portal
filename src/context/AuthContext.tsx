@@ -1,4 +1,5 @@
 import React, { createContext, useCallback, useContext, useEffect, useMemo, useState } from 'react';
+import { apiFetch, setToken } from '../utils/api';
 
 export type UserRole = 'probational' | 'graduate' | 'student' | 'admin';
 
@@ -12,6 +13,7 @@ export type User = {
     department?: string;
   };
   tempPassword?: string; // mock temp password before first login confirmation
+  token?: string;
 };
 
 export type AuthContextType = {
@@ -20,6 +22,7 @@ export type AuthContextType = {
   signIn: (email: string, password: string) => Promise<User>;
   signUp: (email: string, password: string, role: Exclude<UserRole, 'admin'>) => Promise<User>;
   signInAsAdmin?: (email: string, password: string) => Promise<User>;
+  signInWithToken?: (email: string, token: string) => User;
   signOut: () => void;
   completeOnboarding: (profile: NonNullable<User['profile']>) => Promise<User | null>;
   verifyTempPassword: (password: string) => Promise<boolean>;
@@ -42,6 +45,13 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       } catch {}
     }
     setLoading(false);
+  }, []);
+
+  const signInWithToken = useCallback((email: string, token: string) => {
+    const admin: User = { email, role: 'admin', onboardingComplete: true, token };
+    setToken(token);
+    setUser(admin);
+    return admin;
   }, []);
 
   useEffect(() => {
@@ -67,6 +77,21 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   }, []);
 
   const signOut = useCallback(() => setUser(null), []);
+  
+  const signInAsAdmin = useCallback(async (email: string, password: string) => {
+    // Real API login for admin (relative first to use proxy in dev; apiFetch falls back to absolute)
+    const res = await apiFetch<{ message?: string; user?: { name?: string; email: string; id?: number }; token?: string }>('/api/auth/login', {
+      method: 'POST',
+      body: { email, password },
+    });
+    if (!res || !res.token) {
+      throw new Error(res?.message || 'Invalid credentials');
+    }
+    const admin: User = { email: res.user?.email || email, role: 'admin', onboardingComplete: true, token: res.token };
+    setToken(res.token);
+    setUser(admin);
+    return admin;
+  }, []);
 
   const completeOnboarding = useCallback(async (profile: NonNullable<User['profile']>) => {
     let updated: User | null = null;
@@ -100,12 +125,8 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   }, [user]);
 
   const value = useMemo(
-    () => ({ user, loading, signIn, signUp, signOut, completeOnboarding, verifyTempPassword, resendTempPassword, signInAsAdmin: async (email: string, _password: string) => {
-      const admin: User = { email, role: 'admin', onboardingComplete: true };
-      setUser(admin);
-      return admin;
-    }}),
-    [user, loading, signIn, signUp, signOut, completeOnboarding, verifyTempPassword, resendTempPassword]
+    () => ({ user, loading, signIn, signUp, signOut: () => { setToken(null); signOut(); }, completeOnboarding, verifyTempPassword, resendTempPassword, signInAsAdmin, signInWithToken }),
+    [user, loading, signIn, signUp, signOut, completeOnboarding, verifyTempPassword, resendTempPassword, signInAsAdmin, signInWithToken]
   );
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;

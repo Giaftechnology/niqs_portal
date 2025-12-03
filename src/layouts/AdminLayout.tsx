@@ -16,6 +16,7 @@ const AdminLayout: React.FC = () => {
   const [open, setOpen] = useState(false);
   const [accessOpen, setAccessOpen] = useState(false);
   const [procureOpen, setProcureOpen] = useState(false);
+  const [managementOpen, setManagementOpen] = useState(false);
   const [logbookOpen, setLogbookOpen] = useState(false);
   const [membershipOpen, setMembershipOpen] = useState(false);
   const [avatarOpen, setAvatarOpen] = useState(false);
@@ -111,6 +112,23 @@ const AdminLayout: React.FC = () => {
             <NavLink to="/admin/events" className={navItemClass as any}>
               <Calendar size={18} /> Events
             </NavLink>
+            <button onClick={()=>setManagementOpen(v=>!v)} className="w-full flex items-center justify-between px-3 py-2 rounded-lg text-sm mt-4 text-gray-700 hover:bg-gray-50">
+              <span className="flex items-center gap-2"><Settings size={14}/> Management</span>
+              {managementOpen ? <ChevronDown size={14}/> : <ChevronRight size={14}/>}
+            </button>
+            {managementOpen && (
+              <div className="ml-2 space-y-1">
+                <NavLink to="/admin/management/departments" className={navItemClass as any}>
+                  <Database size={18} /> Departments
+                </NavLink>
+                <NavLink to="/admin/management/designations" className={navItemClass as any}>
+                  <Wrench size={18} /> Designations
+                </NavLink>
+                <NavLink to="/admin/management/admins" className={navItemClass as any}>
+                  <Users2 size={18} /> Admins
+                </NavLink>
+              </div>
+            )}
             <button onClick={()=>setProcureOpen(v=>!v)} className="w-full flex items-center justify-between px-3 py-2 rounded-lg text-sm mt-4 text-gray-700 hover:bg-gray-50">
               <span className="flex items-center gap-2"><Boxes size={14}/> Procurements</span>
               {procureOpen ? <ChevronDown size={14}/> : <ChevronRight size={14}/>}

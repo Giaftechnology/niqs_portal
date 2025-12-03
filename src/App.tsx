@@ -16,7 +16,6 @@ import Dashboard from './pages/app/Dashboard';
 import Admin from './pages/app/Admin';
 import Exams from './pages/app/Exams';
 import Accounts from './pages/app/Accounts';
-import StudentLogbook from './pages/app/StudentLogbook';
 import SupervisorLogbook from './pages/app/SupervisorLogbook';
 import HR from './pages/app/HR';
 import SuperviseStudentLog from './pages/app/SuperviseStudentLog';
@@ -42,14 +41,11 @@ import AdminExams from './pages/admin/Exams';
 import AdminEvents from './pages/admin/Events';
 import ProcurementDashboard from './pages/admin/ProcurementDashboard';
 import AdminAccessors from './pages/admin/Accessors';
-import AdminStudents from './pages/admin/Students';
-import AdminSubmissions from './pages/admin/Submissions';
 import AdminDietManagement from './pages/admin/DietManagement';
 import AdminDietDetail from './pages/admin/DietDetail';
 import SubmissionDetail from './pages/admin/SubmissionDetail';
 import AdminVendors from './pages/admin/Vendors';
 import AdminRequisitions from './pages/admin/Requisitions';
-import SupervisorAssignments from './pages/admin/SupervisorAssignments';
 import PurchaseOrders from './pages/admin/PurchaseOrders';
 import AdminProfile from './pages/admin/Profile';
 import MembershipDashboard from './pages/admin/membership/Dashboard';
@@ -60,6 +56,10 @@ import MembershipMaturedRoutes from './pages/admin/membership/MaturedRoutes';
 import MembershipApplications from './pages/admin/membership/Applications';
 import MembershipMembers from './pages/admin/membership/Members';
 import MembershipProfileView from './pages/admin/membership/ProfileView';
+// Management pages
+import Departments from './pages/admin/management/Departments';
+import Designations from './pages/admin/management/Designations';
+import AdminsMgmt from './pages/admin/management/Admins';
 
 const App: React.FC = () => {
   return (
@@ -107,6 +107,10 @@ const App: React.FC = () => {
             <Route path="membership/applications" element={<MembershipApplications />} />
             <Route path="membership/members" element={<MembershipMembers />} />
             <Route path="membership/profile/:email" element={<MembershipProfileView />} />
+            {/* Management group */}
+            <Route path="management/departments" element={<Departments />} />
+            <Route path="management/designations" element={<Designations />} />
+            <Route path="management/admins" element={<AdminsMgmt />} />
             {/* Logbook group */}
             <Route path="logbook/supervisors" element={<AdminSupervisors />} />
             <Route path="logbook/accessors" element={<AdminAccessors />} />
