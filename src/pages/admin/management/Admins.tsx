@@ -325,19 +325,19 @@ const Admins: React.FC = () => {
               <input value={form.email} onChange={(e)=>setForm({...form, email: e.target.value})} required className="w-full px-3 py-2 border rounded-md" disabled={submitting} />
             </div>
           )}
-          <div>
+          <div className="md:col-span-3">
             <label className="block text-xs text-gray-600 mb-1">First name</label>
             <input value={form.firstname} onChange={(e)=>setForm({...form, firstname: e.target.value})} required className="w-full px-3 py-2 border rounded-md" disabled={submitting} />
           </div>
-          <div>
+          <div className="md:col-span-3">
             <label className="block text-xs text-gray-600 mb-1">Other name</label>
             <input value={form.othername} onChange={(e)=>setForm({...form, othername: e.target.value})} className="w-full px-3 py-2 border rounded-md" disabled={submitting} />
           </div>
-          <div>
+          <div className="md:col-span-3">
             <label className="block text-xs text-gray-600 mb-1">Last name</label>
             <input value={form.lastname} onChange={(e)=>setForm({...form, lastname: e.target.value})} required className="w-full px-3 py-2 border rounded-md" disabled={submitting} />
           </div>
-          <div>
+          <div className="md:col-span-3">
             <label className="block text-xs text-gray-600 mb-1">Department</label>
             <select value={form.department_id} onFocus={()=>{ if (!deps.length) fetchDeps(); }} onChange={(e)=>setForm({...form, department_id: (e.target.value ? Number(e.target.value) : '') as any})} className="w-full px-3 py-2 border rounded-md" disabled={submitting}>
               <option value="">{depsLoading ? 'Loading…' : 'Select'}</option>
@@ -345,7 +345,7 @@ const Admins: React.FC = () => {
               {deps.map(d => <option key={d.id} value={d.id}>{d.name}</option>)}
             </select>
           </div>
-          <div>
+          <div className="md:col-span-3">
             <label className="block text-xs text-gray-600 mb-1">Designation</label>
             <select value={form.designation_id} onFocus={()=>{ if (!desigs.length) fetchDesigs(); }} onChange={(e)=>setForm({...form, designation_id: (e.target.value ? Number(e.target.value) : '') as any})} className="w-full px-3 py-2 border rounded-md" disabled={submitting}>
               <option value="">{desigsLoading ? 'Loading…' : 'Select'}</option>

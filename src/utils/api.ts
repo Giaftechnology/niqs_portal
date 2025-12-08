@@ -1,6 +1,6 @@
 export const API_BASE = 'https://api.andjemztech.com';
 
-export type HttpMethod = 'GET' | 'POST' | 'PUT' | 'DELETE';
+export type HttpMethod = 'GET' | 'POST' | 'PUT' | 'DELETE' | 'PATCH';
 
 const tokenKey = 'api_token_v1';
 
@@ -34,8 +34,14 @@ export async function apiFetch<T = any>(path: string, options?: { method?: HttpM
   };
   let body: any = undefined;
   if (options?.body !== undefined) {
-    headers['Content-Type'] = 'application/json';
-    body = JSON.stringify(options.body);
+    const isFormData = typeof FormData !== 'undefined' && (options.body instanceof FormData);
+    if (isFormData) {
+      // Let the browser set multipart/form-data boundary automatically
+      body = options.body as FormData;
+    } else {
+      headers['Content-Type'] = 'application/json';
+      body = JSON.stringify(options.body);
+    }
   }
   if (token) headers['Authorization'] = `Bearer ${token}`;
   const doFetch = async (urlToUse: string) => {

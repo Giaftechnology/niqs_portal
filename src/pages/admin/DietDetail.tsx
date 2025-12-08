@@ -3,10 +3,14 @@ import { Link, useNavigate, useParams } from 'react-router-dom';
 import Modal from '../../components/Modal';
 import { AdminStore } from '../../utils/adminStore';
 import StatusPill from '../../components/StatusPill';
+import { apiFetch } from '../../utils/api';
 
 const AdminDietDetail: React.FC = () => {
   const { id } = useParams();
   const navigate = useNavigate();
+  const [dietData, setDietData] = useState<any | null>(null);
+  const [dietLoading, setDietLoading] = useState(false);
+  const [dietError, setDietError] = useState<string | null>(null);
   const [assignOpen, setAssignOpen] = useState(false);
   const [info, setInfo] = useState<{open:boolean; title:string; message?:string}>({open:false, title:''});
   const [assignQ, setAssignQ] = useState('');
@@ -24,8 +28,41 @@ const AdminDietDetail: React.FC = () => {
   const [reduceModal, setReduceModal] = useState<{ open:boolean; accessorId?: string; count: string }>({ open:false, count: '1' });
   const [assignedOverrides, setAssignedOverrides] = useState<Record<string, number>>({});
 
-  const diet = useMemo(() => AdminStore.listDiets().find(d=>d.id===id), [id, version]);
-  const accessors = useMemo(() => diet ? AdminStore.listAccessors().filter(a=>diet.accessorIds.includes(a.id)) : [], [diet, version]);
+  useEffect(() => {
+    let ignore = false;
+    const load = async () => {
+      if (!id) return;
+      setDietLoading(true); setDietError(null);
+      try {
+        let res = await apiFetch<any>(`/api/logbook-diets/${id}`);
+        let d: any = res?.data ? (Array.isArray(res.data) ? res.data.find((x:any)=> String(x.id)===String(id)) || res.data[0] : res.data) : res;
+        if (!d || !d.id) {
+          try {
+            const listRes = await apiFetch<any>('/api/logbook-diets');
+            const raw = Array.isArray(listRes) ? listRes : Array.isArray(listRes?.data) ? listRes.data : Array.isArray(listRes?.data?.data) ? listRes.data.data : [];
+            d = raw.find((x:any) => String(x.id) === String(id)) || null;
+          } catch {}
+        }
+        if (!ignore) setDietData(d || null);
+      } catch (e: any) {
+        if (!ignore) setDietError(e?.message || 'Failed to load diet');
+      } finally {
+        if (!ignore) setDietLoading(false);
+      }
+    };
+    load();
+    return () => { ignore = true; };
+  }, [id]);
+
+  const diet = useMemo(() => {
+    if (dietData) return dietData;
+    return AdminStore.listDiets().find(d=>d.id===id);
+  }, [dietData, id, version]);
+  const accessors = useMemo(() => {
+    if (!diet) return [];
+    const accessorIds: string[] = Array.isArray((diet as any).accessorIds) ? (diet as any).accessorIds : [];
+    return AdminStore.listAccessors().filter(a => accessorIds.includes(a.id));
+  }, [diet, version]);
   const assignmentMap = useMemo(() => diet ? AdminStore.getDietAssignmentsFor(diet.id) : ({} as Record<string,string[]>), [diet, version]);
   const logs = AdminStore.listLogs();
 
@@ -51,13 +88,23 @@ const AdminDietDetail: React.FC = () => {
     return { assigned, accessed, pending, failed, passed, repeating };
   };
 
+  if (dietLoading) return (
+    <div className="space-y-4">
+      <div className="flex items-center gap-2 text-2xl font-semibold">
+        <button onClick={()=>navigate(-1)} className="px-2 py-1 border rounded">← Back</button>
+        <span>Diet Details</span>
+      </div>
+      <div className="text-sm text-gray-600">Loading diet…</div>
+    </div>
+  );
+
   if (!diet) return (
     <div className="space-y-4">
       <div className="flex items-center gap-2 text-2xl font-semibold">
         <button onClick={()=>navigate(-1)} className="px-2 py-1 border rounded">← Back</button>
         <span>Diet Details</span>
       </div>
-      <div className="text-sm text-red-600">Diet not found.</div>
+      <div className="text-sm text-red-600">Diet not found{dietError ? `: ${dietError}` : '.'}</div>
     </div>
   );
 
@@ -77,8 +124,8 @@ const AdminDietDetail: React.FC = () => {
         <div className="flex items-center gap-3">
           <button onClick={()=>navigate(-1)} className="px-2 py-1 border rounded">← Back</button>
           <div>
-            <div className="text-2xl font-semibold">{diet.sessionName} - {diet.diet}</div>
-            <div className="text-sm text-gray-500">Year {diet.year} • Starts {diet.startDate}</div>
+            <div className="text-2xl font-semibold">{diet.sessionName ? `${diet.sessionName} - ${diet.diet}` : diet.title}</div>
+            <div className="text-sm text-gray-500">{diet.year ? `Year ${diet.year} • Starts ${diet.startDate}` : `Starts ${diet.start_date} • Ends ${diet.end_date}`}</div>
           </div>
         </div>
         <div className="space-x-2 flex items-center">

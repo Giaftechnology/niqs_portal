@@ -19,6 +19,7 @@ const AdminLayout: React.FC = () => {
   const [managementOpen, setManagementOpen] = useState(false);
   const [logbookOpen, setLogbookOpen] = useState(false);
   const [membershipOpen, setMembershipOpen] = useState(false);
+  const [applicationsOpen, setApplicationsOpen] = useState(false);
   const [avatarOpen, setAvatarOpen] = useState(false);
 
   useEffect(() => {
@@ -105,7 +106,26 @@ const AdminLayout: React.FC = () => {
                 </NavLink>
               </div>
             )}
-
+            <button onClick={()=>setApplicationsOpen(v=>!v)} className="w-full flex items-center justify-between px-3 py-2 rounded-lg text-sm mt-4 text-gray-700 hover:bg-gray-50">
+              <span className="flex items-center gap-2"><Inbox size={14}/> Applications</span>
+              {applicationsOpen ? <ChevronDown size={14}/> : <ChevronRight size={14}/>}
+            </button>
+            {applicationsOpen && (
+              <div className="ml-2 space-y-1">
+                <NavLink to="/admin/applications" end className={navItemClass as any}>
+                  <LayoutGrid size={18} /> Dashboard
+                </NavLink>
+                <NavLink to="/admin/applications/my" className={navItemClass as any}>
+                  <Inbox size={18} /> My Application
+                </NavLink>
+                <NavLink to="/admin/applications/probationals" className={navItemClass as any}>
+                  <Users2 size={18} /> Probationals
+                </NavLink>
+                <NavLink to="/admin/applications/graduates" className={navItemClass as any}>
+                  <GraduationCap size={18} /> Graduates
+                </NavLink>
+              </div>
+            )}
             <NavLink to="/admin/exams" className={navItemClass as any}>
               <ClipboardList size={18} /> Exams
             </NavLink>
@@ -126,6 +146,9 @@ const AdminLayout: React.FC = () => {
                 </NavLink>
                 <NavLink to="/admin/management/admins" className={navItemClass as any}>
                   <Users2 size={18} /> Admins
+                </NavLink>
+                <NavLink to="/admin/management/executives" className={navItemClass as any}>
+                  <Shield size={18} /> Executive Management
                 </NavLink>
               </div>
             )}
@@ -149,13 +172,18 @@ const AdminLayout: React.FC = () => {
                 </NavLink>
               </div>
             )}
-
             <button onClick={()=>setLogbookOpen(v=>!v)} className="w-full flex items-center justify-between px-3 py-2 rounded-lg text-sm mt-4 text-gray-700 hover:bg-gray-50">
               <span className="flex items-center gap-2"><BookOpen size={14}/> Logbook</span>
               {logbookOpen ? <ChevronDown size={14}/> : <ChevronRight size={14}/>}
             </button>
             {logbookOpen && (
               <div className="ml-2 space-y-1">
+                <NavLink to="/admin/logbook/my-logbook" className={navItemClass as any}>
+                  <BookOpen size={18} /> My Logbook
+                </NavLink>
+                <NavLink to="/admin/logbook/logbooks" className={navItemClass as any}>
+                  <BookOpen size={18} /> Logbooks
+                </NavLink>
                 <NavLink to="/admin/logbook/accessors" className={navItemClass as any}>
                   <ShieldCheck size={18} /> Accessors
                 </NavLink>
@@ -164,7 +192,6 @@ const AdminLayout: React.FC = () => {
                 </NavLink>
               </div>
             )}
-
             <button onClick={()=>setMembershipOpen(v=>!v)} className="w-full flex items-center justify-between px-3 py-2 rounded-lg text-sm mt-4 text-gray-700 hover:bg-gray-50">
               <span className="flex items-center gap-2"><GraduationCap size={14}/> Membership</span>
               {membershipOpen ? <ChevronDown size={14}/> : <ChevronRight size={14}/>}

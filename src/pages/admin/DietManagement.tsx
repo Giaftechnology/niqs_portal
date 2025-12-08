@@ -1,14 +1,21 @@
-import React, { useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import Modal from '../../components/Modal';
+import { apiFetch } from '../../utils/api';
 import { AdminStore } from '../../utils/adminStore';
 
 const AdminDietManagement: React.FC = () => {
   const [q, setQ] = useState('');
   const navigate = useNavigate();
-  const [items, setItems] = useState(AdminStore.listDiets());
-  const [sort, setSort] = useState<'name'|'date'>('date');
+  const [items, setItems] = useState<Array<{ id: string; title: string; start_date: string; end_date: string; notes?: string; status?: string; is_active?: boolean | number; approved_by?: string | null; approved_at?: string | null; created_at?: string; updated_at?: string }>>([]);
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [sort, setSort] = useState<'title'|'start'>('start');
   const [confirm, setConfirm] = useState<{open:boolean;title:string;message?:string;onConfirm?:()=>void}>({open:false,title:''});
+  const [successMsg, setSuccessMsg] = useState<string | null>(null);
+  const [rowBusy, setRowBusy] = useState<Record<string, boolean>>({});
+  const [rowAction, setRowAction] = useState<Record<string, 'view'|'approve'|'reject'|'activate'|'delete'>>({});
+  // keep placeholders used below to preserve layout and comments
   const [input, setInput] = useState<InputState>({ open:false, title:'' });
   const [details, setDetails] = useState<{open:boolean; title:string; body?:React.ReactNode}>({open:false, title:''});
   const [assign, setAssign] = useState<{open:boolean; dietId?:string}>({open:false});
@@ -16,23 +23,104 @@ const AdminDietManagement: React.FC = () => {
   const [supPick, setSupPick] = useState<{open:boolean; studentEmail?:string}>({open:false});
   const [supQ, setSupQ] = useState('');
 
+  // Create Diet modal state
+  const [createOpen, setCreateOpen] = useState(false);
+  const [createForm, setCreateForm] = useState<{ title: string; start_date: string; end_date: string; notes: string }>({ title: '', start_date: '', end_date: '', notes: '' });
+  const [creating, setCreating] = useState(false);
+  const [formError, setFormError] = useState<string | null>(null);
+
+  // Extend Diet modal state
+  const [extendState, setExtendState] = useState<{ open: boolean; id?: string; new_end_date: string }>({ open: false, id: undefined, new_end_date: '' });
+  const [extSubmitting, setExtSubmitting] = useState(false);
+  const [extError, setExtError] = useState<string | null>(null);
+
   const years = useMemo(() => { const now = new Date().getFullYear(); return Array.from({length: 60}, (_,i)=>String(now-i)); }, []);
   const filtered = useMemo(() => {
-    const list = [...items].filter(i => `${i.sessionName} ${i.diet} ${i.year}`.toLowerCase().includes(q.toLowerCase()));
-    if (sort==='name') list.sort((a,b)=>a.sessionName.localeCompare(b.sessionName));
-    if (sort==='date') list.sort((a,b)=>a.startDate.localeCompare(b.startDate));
+    const list = [...items].filter(i => `${i.title} ${i.start_date} ${i.end_date} ${i.status}`.toLowerCase().includes(q.toLowerCase()));
+    if (sort==='title') list.sort((a,b)=> (a.title||'').localeCompare(b.title||''));
+    if (sort==='start') list.sort((a,b)=> (a.start_date||'').localeCompare(b.start_date||''));
     return list;
   }, [items, q, sort]);
 
-  const addItem = () => setInput({ open:true, title:'Create Diet', onSave: (v)=>{ AdminStore.createDiet(v); setItems(AdminStore.listDiets()); setInput({open:false,title:''}); }});
-  const editItem = (id:string) => { const curr = items.find(x=>x.id===id); if(!curr) return; setInput({ open:true, title:'Edit Diet', initial: curr, onSave: (v)=>{ AdminStore.updateDiet({ ...curr, ...v } as any); setItems(AdminStore.listDiets()); setInput({open:false,title:''}); } }); };
-  const deleteItem = (id:string) => { const curr = items.find(x=>x.id===id); if(!curr) return; setConfirm({ open:true, title:'Delete Diet?', message:`Delete ${curr.sessionName} - ${curr.diet}?`, onConfirm:()=>{ AdminStore.deleteDiet(id); setItems(AdminStore.listDiets()); setConfirm({open:false,title:''}); } }); };
-
-  const closeDiet = (id:string) => {
-    const curr = items.find(x=>x.id===id); if(!curr) return;
-    setConfirm({ open:true, title:'Close Diet?', message:`Are you sure you want to close ${curr.sessionName} - ${curr.diet}?`, onConfirm:()=>{ AdminStore.setDietStatus(id,'closed'); setItems(AdminStore.listDiets()); setConfirm({open:false,title:''}); }});
+  const fetchList = async () => {
+    setLoading(true); setError(null);
+    try {
+      const res = await apiFetch<any>('/api/logbook-diets');
+      const raw = Array.isArray(res) ? res : Array.isArray(res?.data) ? res.data : Array.isArray(res?.data?.data) ? res.data.data : [];
+      const normalized = raw.map((x: any) => ({
+        id: String(x.id),
+        title: x.title,
+        start_date: x.start_date,
+        end_date: x.end_date,
+        notes: x.notes,
+        status: x.status,
+        is_active: typeof x.is_active === 'boolean' ? x.is_active : (x.is_active ? true : false),
+        approved_by: x.approved_by ?? null,
+        approved_at: x.approved_at ?? null,
+        created_at: x.created_at,
+        updated_at: x.updated_at,
+      }));
+      setItems(normalized);
+    } catch (e: any) {
+      setError(e.message || 'Failed to load diets');
+    } finally { setLoading(false); }
   };
-  const openDiet = (id:string) => { AdminStore.setDietStatus(id,'open'); setItems(AdminStore.listDiets()); };
+
+  useEffect(() => { fetchList(); }, []);
+
+  const openCreate = () => { setCreateForm({ title: '', start_date: '', end_date: '', notes: '' }); setFormError(null); setCreateOpen(true); };
+  const submitCreate = async () => {
+    if (!createForm.title.trim() || !createForm.start_date || !createForm.end_date) { setFormError('Title, start and end date are required'); return; }
+    setCreating(true); setFormError(null);
+    try {
+      const res = await apiFetch('/api/logbook-diets', { method: 'POST', body: { ...createForm } });
+      const ok = Boolean(res?.data?.id || res?.id || typeof res?.message === 'string');
+      if (!ok) throw new Error(res?.message || 'Create failed');
+      setCreateOpen(false);
+      await fetchList();
+      try { const ev = new CustomEvent('global-alert', { detail: { title: 'Success', message: 'Diet created (pending approval).' } }); window.dispatchEvent(ev); document.dispatchEvent(ev); } catch {}
+      setSuccessMsg('Diet created (pending approval).');
+    } catch (e: any) { setFormError(e?.message || 'Request failed'); }
+    finally { setCreating(false); }
+  };
+
+  const approveDiet = async (id: string) => {
+    setRowBusy(m=>({ ...m, [id]: true })); setRowAction(m=>({ ...m, [id]: 'approve' }));
+    try { await apiFetch(`/api/logbook-diets/${id}/approve`, { method: 'POST' }); await fetchList(); try { const ev = new CustomEvent('global-alert', { detail: { title: 'Success', message: 'Diet approved.' } }); window.dispatchEvent(ev); document.dispatchEvent(ev); } catch {} }
+    catch (e: any) { alert(e?.message || 'Approve failed'); }
+    finally { setRowBusy(m=>({ ...m, [id]: false })); setRowAction(m=>{ const n={...m}; delete n[id]; return n; }); }
+  };
+  const rejectDiet = async (id: string) => {
+    setRowBusy(m=>({ ...m, [id]: true })); setRowAction(m=>({ ...m, [id]: 'reject' }));
+    try { await apiFetch(`/api/logbook-diets/${id}/reject`, { method: 'POST' }); await fetchList(); try { const ev = new CustomEvent('global-alert', { detail: { title: 'Success', message: 'Diet rejected.' } }); window.dispatchEvent(ev); document.dispatchEvent(ev); } catch {} }
+    catch (e: any) { alert(e?.message || 'Reject failed'); }
+    finally { setRowBusy(m=>({ ...m, [id]: false })); setRowAction(m=>{ const n={...m}; delete n[id]; return n; }); }
+  };
+  const activateDiet = async (id: string) => {
+    setRowBusy(m=>({ ...m, [id]: true })); setRowAction(m=>({ ...m, [id]: 'activate' }));
+    try { await apiFetch(`/api/logbook-diets/${id}/activate`, { method: 'POST' }); await fetchList(); try { const ev = new CustomEvent('global-alert', { detail: { title: 'Success', message: 'Diet activated.' } }); window.dispatchEvent(ev); document.dispatchEvent(ev); } catch {} }
+    catch (e: any) { alert(e?.message || 'Activate failed'); }
+    finally { setRowBusy(m=>({ ...m, [id]: false })); setRowAction(m=>{ const n={...m}; delete n[id]; return n; }); }
+  };
+  const openExtend = (id: string) => { setExtendState({ open: true, id, new_end_date: '' }); setExtError(null); };
+  const submitExtend = async () => {
+    if (!extendState.id || !extendState.new_end_date) { setExtError('New end date is required'); return; }
+    setExtSubmitting(true); setExtError(null);
+    try { await apiFetch(`/api/logbook-diets/${extendState.id}/extend`, { method: 'POST', body: { new_end_date: extendState.new_end_date } }); setExtendState({ open: false, id: undefined, new_end_date: '' }); await fetchList(); try { const ev = new CustomEvent('global-alert', { detail: { title: 'Success', message: 'End date extended.' } }); window.dispatchEvent(ev); document.dispatchEvent(ev); } catch {} } catch (e: any) { setExtError(e?.message || 'Extend failed'); }
+    finally { setExtSubmitting(false); }
+  };
+  const deleteDiet = (id: string) => {
+    const curr = items.find(x=>x.id===id); if(!curr) return;
+    setConfirm({ open:true, title:'Delete Diet?', message:`Delete ${curr.title}?`, onConfirm: async ()=>{
+      setRowBusy(m=>({ ...m, [id]: true })); setRowAction(m=>({ ...m, [id]: 'delete' }));
+      try { await apiFetch(`/api/logbook-diets/${id}`, { method: 'DELETE' }); await fetchList(); } catch (e: any) { alert(e?.message || 'Delete failed'); }
+      finally { setRowBusy(m=>({ ...m, [id]: false })); setRowAction(m=>{ const n={...m}; delete n[id]; return n; }); }
+      setConfirm({open:false,title:''});
+    } });
+  };
+  const closeActiveDiets = async () => {
+    try { await apiFetch('/api/logbook-diets/active-close/run', { method: 'GET' }); await fetchList(); try { const ev = new CustomEvent('global-alert', { detail: { title: 'Success', message: 'Active diets closed.' } }); window.dispatchEvent(ev); document.dispatchEvent(ev); } catch {} } catch (e: any) { alert(e?.message || 'Close active diets failed'); }
+  };
 
   const openDetails = (id:string) => {
     navigate(`/admin/logbook/diet-management/${id}`);
@@ -47,57 +135,121 @@ const AdminDietManagement: React.FC = () => {
       <div className="flex items-center justify-between">
         <input value={q} onChange={e=>setQ(e.target.value)} placeholder="Search Diets" className="px-3 py-2 border rounded-md text-sm w-72"/>
         <div className="space-x-2">
-          <button onClick={()=>setSort('name')} className="px-3 py-2 border rounded-md text-sm">🔤 Sort</button>
-          <button onClick={()=>setSort('date')} className="px-3 py-2 border rounded-md text-sm">📅 Sort</button>
-          <button onClick={addItem} className="px-3 py-2 bg-indigo-600 text-white rounded-md text-sm">+ Create Diet</button>
+          <button onClick={()=>setSort('title')} className="px-3 py-2 border rounded-md text-sm">🔤 Sort</button>
+          <button onClick={()=>setSort('start')} className="px-3 py-2 border rounded-md text-sm">📅 Sort</button>
+          <button onClick={closeActiveDiets} className="px-3 py-2 border rounded-md text-sm">Close Active Diets</button>
+          <button onClick={openCreate} className="px-3 py-2 bg-indigo-600 text-white rounded-md text-sm">+ Create Diet</button>
         </div>
       </div>
+      {successMsg && (
+        <div className="p-3 border rounded-md bg-green-50 text-green-700 border-green-200 text-sm">{successMsg}</div>
+      )}
+      {error && (
+        <div className="p-3 border rounded-md bg-red-50 text-red-700 border-red-200 text-sm">{error}</div>
+      )}
       <div className="bg-white border rounded-xl">
         <table className="w-full text-sm">
           <thead>
             <tr className="text-left">
-              <th className="p-3">Session</th>
-              <th className="p-3">Diet</th>
-              <th className="p-3">Year</th>
+              <th className="p-3">Title</th>
               <th className="p-3">Start Date</th>
+              <th className="p-3">End Date</th>
               <th className="p-3">Status</th>
-              <th className="p-3">Actions</th>
+              <th className="p-3">Active</th>
+              <th className="p-3 text-right">Actions</th>
             </tr>
           </thead>
           <tbody>
-            {filtered.map(v => (
-              <tr key={v.id} className="border-t">
-                <td className="p-3">{v.sessionName}</td>
-                <td className="p-3">{v.diet}</td>
-                <td className="p-3">{v.year}</td>
-                <td className="p-3">{v.startDate}</td>
-                <td className="p-3">
-                  <span
-                    className={`px-2 py-0.5 rounded text-xs ${
-                      v.status === 'open'
-                        ? 'bg-green-100 text-green-700'
-                        : v.status === 'pending'
-                        ? 'bg-amber-100 text-amber-700'
-                        : 'bg-gray-200 text-gray-600'
-                    }`}
-                  >
-                    {v.status}
-                  </span>
-                </td>
-                <td className="p-3 space-x-2">
-                  <button onClick={()=>openDetails(v.id)} className="px-2 py-1 text-xs border rounded">View</button>
-                  <button onClick={()=>editItem(v.id)} className="px-2 py-1 text-xs border rounded">✏️</button>
-                  <button onClick={()=>deleteItem(v.id)} className="px-2 py-1 text-xs bg-red-500 text-white rounded">🗑️</button>
-                </td>
-              </tr>
-            ))}
+            {filtered.map(v => {
+              const isActive = (v.is_active === true) || (v.is_active as any) === 1 || String(v.status).toLowerCase() === 'active';
+              const isPending = String(v.status).toLowerCase() === 'pending';
+              const isApproved = String(v.status).toLowerCase() === 'approved';
+              return (
+                <tr key={v.id} className="border-t">
+                  <td className="p-3">{v.title}</td>
+                  <td className="p-3">{v.start_date}</td>
+                  <td className="p-3">{v.end_date}</td>
+                  <td className="p-3">
+                    <span className={`px-2 py-0.5 rounded text-xs ${isActive ? 'bg-green-100 text-green-700' : isPending ? 'bg-amber-100 text-amber-700' : isApproved ? 'bg-blue-100 text-blue-700' : 'bg-gray-200 text-gray-600'}`}>{v.status || '-'}</span>
+                  </td>
+                  <td className="p-3">{isActive ? 'Yes' : 'No'}</td>
+                  <td className="p-3 text-right">
+                    <div className="flex flex-wrap gap-2 justify-end">
+                      <button onClick={()=>{ setRowBusy(m=>({ ...m, [v.id]: true })); setRowAction(m=>({ ...m, [v.id]: 'view' })); openDetails(v.id); }} className="px-2 py-1 text-xs border rounded" disabled={rowBusy[v.id]}>{rowBusy[v.id] && rowAction[v.id]==='view' ? 'Opening…' : 'View'}</button>
+                      {isPending && (
+                        <>
+                          <button onClick={()=>approveDiet(v.id)} className="px-2 py-1 text-xs rounded bg-green-600 text-white" disabled={rowBusy[v.id]}>{rowBusy[v.id] && rowAction[v.id]==='approve' ? 'Approving…' : 'Approve'}</button>
+                          <button onClick={()=>rejectDiet(v.id)} className="px-2 py-1 text-xs rounded bg-amber-500 text-white" disabled={rowBusy[v.id]}>{rowBusy[v.id] && rowAction[v.id]==='reject' ? 'Rejecting…' : 'Reject'}</button>
+                          <button onClick={()=>deleteDiet(v.id)} className="px-2 py-1 text-xs rounded bg-red-50 text-red-700 border border-red-200" disabled={rowBusy[v.id]}>{rowBusy[v.id] && rowAction[v.id]==='delete' ? 'Deleting…' : 'Delete'}</button>
+                        </>
+                      )}
+                      {isApproved && (
+                        <button onClick={()=>activateDiet(v.id)} className="px-2 py-1 text-xs rounded bg-indigo-600 text-white" disabled={rowBusy[v.id]}>{rowBusy[v.id] && rowAction[v.id]==='activate' ? 'Activating…' : 'Activate'}</button>
+                      )}
+                      {isActive && (
+                        <button onClick={()=>openExtend(v.id)} className="px-2 py-1 text-xs rounded border">Extend</button>
+                      )}
+                    </div>
+                  </td>
+                </tr>
+              );
+            })}
           </tbody>
         </table>
       </div>
       <Modal open={confirm.open} title={confirm.title} onClose={()=>setConfirm({open:false,title:''})} onConfirm={confirm.onConfirm} confirmText="Delete">{confirm.message}</Modal>
       {input.open && (<DietInputModal title={input.title} initial={input.initial} years={years} onClose={()=>setInput({open:false,title:''})} onSave={input.onSave} />)}
+      <Modal
+        open={createOpen}
+        title="Create Diet"
+        onClose={()=>{ setCreateOpen(false); setFormError(null); }}
+        onConfirm={()=>{ if (!creating) void submitCreate(); }}
+        confirmText={creating ? 'Creating…' : 'Create'}
+        closeText={creating ? 'Close' : 'Cancel'}
+        panelClassName="max-w-xl"
+        bodyClassName="!text-inherit"
+      >
+        <div className="grid grid-cols-1 gap-3">
+          <div>
+            <div className="text-xs font-medium text-gray-700 mb-1">Title</div>
+            <input value={createForm.title} onChange={e=>setCreateForm({...createForm, title: e.target.value})} className="w-full px-3 py-2 border rounded-md text-sm" disabled={creating} />
+          </div>
+          <div>
+            <div className="text-xs font-medium text-gray-700 mb-1">Start Date</div>
+            <input type="date" value={createForm.start_date} onChange={e=>setCreateForm({...createForm, start_date: e.target.value})} className="w-full px-3 py-2 border rounded-md text-sm" disabled={creating} />
+          </div>
+          <div>
+            <div className="text-xs font-medium text-gray-700 mb-1">End Date</div>
+            <input type="date" value={createForm.end_date} onChange={e=>setCreateForm({...createForm, end_date: e.target.value})} className="w-full px-3 py-2 border rounded-md text-sm" disabled={creating} />
+          </div>
+          <div>
+            <div className="text-xs font-medium text-gray-700 mb-1">Notes</div>
+            <textarea value={createForm.notes} onChange={e=>setCreateForm({...createForm, notes: e.target.value})} className="w-full px-3 py-2 border rounded-md text-sm" disabled={creating} />
+          </div>
+          {formError && <div className="text-sm text-red-600">{formError}</div>}
+        </div>
+      </Modal>
+
+      <Modal
+        open={extendState.open}
+        title="Extend Diet End Date"
+        onClose={()=>{ setExtendState({ open:false, id: undefined, new_end_date: '' }); setExtError(null); }}
+        onConfirm={()=>{ if (!extSubmitting) void submitExtend(); }}
+        confirmText={extSubmitting ? 'Extending…' : 'Extend'}
+        closeText={extSubmitting ? 'Close' : 'Cancel'}
+        panelClassName="max-w-md"
+        bodyClassName="!text-inherit"
+      >
+        <div className="grid grid-cols-1 gap-3">
+          <div>
+            <div className="text-xs font-medium text-gray-700 mb-1">New End Date</div>
+            <input type="date" value={extendState.new_end_date} onChange={e=>setExtendState(s=>({...s, new_end_date: e.target.value}))} className="w-full px-3 py-2 border rounded-md text-sm" disabled={extSubmitting} />
+          </div>
+          {extError && <div className="text-sm text-red-600">{extError}</div>}
+        </div>
+      </Modal>
       {/* details now shown on dedicated page */}
-      <AssignAccessorModal open={assign.open} dietId={assign.dietId} onClose={()=>{ setAssign({open:false}); setAssignQ(''); }} q={assignQ} setQ={setAssignQ} onAssigned={()=>{ setItems(AdminStore.listDiets()); setDetails(d=>({ ...d })); }} />
+      <AssignAccessorModal open={assign.open} dietId={assign.dietId} onClose={()=>{ setAssign({open:false}); setAssignQ(''); }} q={assignQ} setQ={setAssignQ} onAssigned={()=>{ fetchList(); setDetails(d=>({ ...d })); }} />
       <AssignSupervisorModal open={supPick.open} studentEmail={supPick.studentEmail} q={supQ} setQ={setSupQ} onClose={()=>{ setSupPick({open:false}); setSupQ(''); }} />
     </div>
   );
