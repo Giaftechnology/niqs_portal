@@ -20,7 +20,7 @@ interface ProbationerMeApp {
 }
 
 const MyApplication: React.FC = () => {
-  const [item, setItem] = useState<ProbationerMeApp | null>(null);
+  const [items, setItems] = useState<ProbationerMeApp[]>([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const navigate = useNavigate();
@@ -37,27 +37,23 @@ const MyApplication: React.FC = () => {
             : Array.isArray(res?.data?.data)
               ? res.data.data
               : [];
-        const obj = Array.isArray(raw) && raw.length ? raw[0] : null;
-        if (obj && typeof obj === 'object') {
-          setItem({
-            id: String(obj.id),
-            surname: obj.surname,
-            other_names: obj.other_names,
-            title: obj.title,
-            email: obj.email,
-            phone: obj.phone,
-            date_of_birth: obj.date_of_birth,
-            nationality: obj.nationality,
-            postal_address: obj.postal_address,
-            residential_address: obj.residential_address,
-            status: obj.status,
-            completion_step: obj.completion_step,
-            created_at: obj.created_at,
-            updated_at: obj.updated_at,
-          });
-        } else {
-          setItem(null);
-        }
+        const mapped: ProbationerMeApp[] = (Array.isArray(raw) ? raw : []).map((obj: any) => ({
+          id: String(obj.id),
+          surname: obj.surname,
+          other_names: obj.other_names,
+          title: obj.title,
+          email: obj.email,
+          phone: obj.phone,
+          date_of_birth: obj.date_of_birth,
+          nationality: obj.nationality,
+          postal_address: obj.postal_address,
+          residential_address: obj.residential_address,
+          status: obj.status,
+          completion_step: obj.completion_step,
+          created_at: obj.created_at,
+          updated_at: obj.updated_at,
+        }));
+        setItems(mapped);
       } catch (e: any) {
         setError(e?.message || 'Failed to load application');
       } finally {
@@ -67,13 +63,13 @@ const MyApplication: React.FC = () => {
     load();
   }, []);
 
-  const displayStep = (() => {
-    if (!item) return '-';
-    const s = String(item.status || '').toLowerCase();
+  const displayStep = (app?: ProbationerMeApp | null) => {
+    if (!app) return '-';
+    const s = String(app.status || '').toLowerCase();
     if (s === 'acknowledged' || s === 'approved') return 8;
-    if (typeof item.completion_step === 'number') return item.completion_step;
+    if (typeof app.completion_step === 'number') return app.completion_step;
     return '-';
-  })();
+  };
 
   return (
     <div className="space-y-4">
@@ -83,43 +79,52 @@ const MyApplication: React.FC = () => {
       </div>
       {loading && (<div className="p-3 border rounded-md bg-gray-50 text-gray-700 text-sm">Loading…</div>)}
       {error && (<div className="p-3 border rounded-md bg-red-50 text-red-700 border-red-200 text-sm">{error}</div>)}
-      {!loading && !item && !error && (
+      {!loading && !items.length && !error && (
         <div className="p-3 border rounded-md bg-white text-sm">
           <div className="font-medium mb-1">No application found</div>
           <div className="text-gray-600 mb-2">You have not started a probationer application yet.</div>
           <Link to="/admin/applications/probationals/new" className="px-3 py-2 bg-indigo-600 text-white rounded-md text-sm inline-block">Start New Application</Link>
         </div>
       )}
-      {item && !loading && (
-        <div className="bg-white border rounded-xl p-4 space-y-2 text-sm">
+      {!loading && items.length > 0 && (
+        <div className="bg-white border rounded-xl p-4 space-y-3 text-sm">
           <div className="flex items-center justify-between">
-            <div className="font-medium">Application Overview</div>
-            <div className="text-xs text-gray-500">ID: {item.id}</div>
+            <div className="font-medium">My Applications</div>
+            <div className="text-xs text-gray-500">Total: {items.length}</div>
           </div>
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-            <div className="space-y-1">
-              <div><span className="text-gray-500">Name:</span> {[item.title, item.surname, item.other_names].filter(Boolean).join(' ') || '-'}</div>
-              <div><span className="text-gray-500">Email:</span> {item.email || '-'}</div>
-              <div><span className="text-gray-500">Phone:</span> {item.phone || '-'}</div>
-              <div><span className="text-gray-500">DOB:</span> {item.date_of_birth || '-'}</div>
-              <div><span className="text-gray-500">Nationality:</span> {item.nationality || '-'}</div>
-            </div>
-            <div className="space-y-1">
-              <div><span className="text-gray-500">Postal Address:</span> {item.postal_address || '-'}</div>
-              <div><span className="text-gray-500">Residential Address:</span> {item.residential_address || '-'}</div>
-              <div><span className="text-gray-500">Status:</span> {item.status || '-'}</div>
-              <div><span className="text-gray-500">Step:</span> {displayStep}</div>
-              <div><span className="text-gray-500">Created:</span> {item.created_at ? new Date(item.created_at).toLocaleString() : '-'}</div>
-            </div>
-          </div>
-          <div className="mt-3">
-            <button
-              type="button"
-              onClick={() => navigate(`/admin/applications/probationals/${item.id}`)}
-              className="px-3 py-2 border rounded-md text-sm"
-            >
-              View Full Details
-            </button>
+          <div className="overflow-x-auto">
+            <table className="min-w-full text-xs md:text-sm">
+              <thead className="bg-gray-50">
+                <tr>
+                  <th className="text-left px-3 py-2">Name</th>
+                  <th className="text-left px-3 py-2">Email</th>
+                  <th className="text-left px-3 py-2">Status</th>
+                  <th className="text-left px-3 py-2">Step</th>
+                  <th className="text-left px-3 py-2">Created</th>
+                  <th className="text-right px-3 py-2">Actions</th>
+                </tr>
+              </thead>
+              <tbody>
+                {items.map(app => (
+                  <tr key={app.id} className="border-t">
+                    <td className="px-3 py-2">{[app.title, app.surname, app.other_names].filter(Boolean).join(' ') || '-'}</td>
+                    <td className="px-3 py-2">{app.email || '-'}</td>
+                    <td className="px-3 py-2">{app.status || '-'}</td>
+                    <td className="px-3 py-2">{displayStep(app)}</td>
+                    <td className="px-3 py-2">{app.created_at ? new Date(app.created_at).toLocaleString() : '-'}</td>
+                    <td className="px-3 py-2 text-right">
+                      <button
+                        type="button"
+                        onClick={() => navigate(`/admin/applications/my/${app.id}`)}
+                        className="px-2 py-1 border rounded-md text-xs"
+                      >
+                        View
+                      </button>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
           </div>
         </div>
       )}

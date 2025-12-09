@@ -61,6 +61,8 @@ import Departments from './pages/admin/management/Departments';
 import Designations from './pages/admin/management/Designations';
 import AdminsMgmt from './pages/admin/management/Admins';
 import ExecutivesMgmt from './pages/admin/management/Executives';
+import AdminDetail from './pages/admin/management/AdminDetail';
+import ExecutiveSetDetail from './pages/admin/management/ExecutiveSetDetail';
 // Applications pages
 import ApplicationsDashboard from './pages/admin/applications/Dashboard';
 import ApplicationsProbationals from './pages/admin/applications/Probationals';
@@ -68,6 +70,7 @@ import ApplicationsGraduates from './pages/admin/applications/Graduates';
 import ApplicationsProbationerNew from './pages/admin/applications/ProbationerNew';
 import ApplicationsProbationerDetail from './pages/admin/applications/ProbationerDetail';
 import MyApplication from './pages/admin/applications/MyApplication';
+import MyApplicationDetail from './pages/admin/applications/MyApplicationDetail';
 import MyLogbook from './pages/admin/logbook/MyLogbook';
 import AdminLogbooks from './pages/admin/logbook/Logbooks';
 
@@ -121,10 +124,13 @@ const App: React.FC = () => {
             <Route path="management/departments" element={<Departments />} />
             <Route path="management/designations" element={<Designations />} />
             <Route path="management/admins" element={<AdminsMgmt />} />
+            <Route path="management/admins/:id" element={<AdminDetail />} />
             <Route path="management/executives" element={<ExecutivesMgmt />} />
+            <Route path="management/executives/:id" element={<ExecutiveSetDetail />} />
             {/* Applications group */}
             <Route path="applications" element={<ApplicationsDashboard />} />
             <Route path="applications/my" element={<MyApplication />} />
+            <Route path="applications/my/:id" element={<MyApplicationDetail />} />
             <Route path="applications/probationals" element={<ApplicationsProbationals />} />
             <Route path="applications/probationals/:id" element={<ApplicationsProbationerDetail />} />
             <Route path="applications/probationals/new" element={<ApplicationsProbationerNew />} />

@@ -1,4 +1,5 @@
 import React, { useEffect, useMemo, useState } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { apiFetch } from '../../../utils/api';
 import Modal from '../../../components/Modal';
 
@@ -35,6 +36,7 @@ const Admins: React.FC = () => {
   const [depsLoading, setDepsLoading] = useState(false);
   const [desigsLoading, setDesigsLoading] = useState(false);
   const [successMsg, setSuccessMsg] = useState<string | null>(null);
+  const navigate = useNavigate();
 
   const filtered = useMemo(() => {
     const s = q.trim().toLowerCase();
@@ -408,9 +410,8 @@ const Admins: React.FC = () => {
                     <td className="px-3 py-2 text-right">
                       <div className="flex gap-2 justify-end">
                         <button onClick={()=>onEdit(a)} className="px-2 py-1 border rounded-md text-blue-600 border-blue-200 hover:bg-blue-50" disabled={rowBusy[a.id]}>Edit</button>
-                        <button onClick={()=>setAssignDept({ id: a.id, department_id: '' as any })} className="px-2 py-1 border rounded-md text-indigo-600 border-indigo-200 hover:bg-indigo-50" disabled={rowBusy[a.id]}>Assign Dept</button>
+                        <button onClick={()=>navigate(`/admin/management/admins/${a.id}`)} className="px-2 py-1 border rounded-md text-indigo-600 border-indigo-200 hover:bg-indigo-50" disabled={rowBusy[a.id]}>View</button>
                         <button onClick={()=>toggleActive(a)} className={`px-2 py-1 rounded-md ${isActive ? 'bg-amber-500 text-white' : 'bg-green-600 text-white'}`} disabled={rowBusy[a.id]}>{isActive ? 'Deactivate' : 'Activate'}</button>
-                        <button onClick={()=>onDelete(a)} className="px-2 py-1 rounded-md bg-red-50 text-red-700 border border-red-200 hover:bg-red-100" disabled={rowBusy[a.id]}>Delete</button>
                       </div>
                     </td>
                   </tr>

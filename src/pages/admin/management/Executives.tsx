@@ -1,4 +1,5 @@
 import React, { useEffect, useMemo, useState } from 'react';
+import { useNavigate } from 'react-router-dom';
 import Modal from '../../../components/Modal';
 import { apiFetch } from '../../../utils/api';
 
@@ -35,6 +36,12 @@ const Executives: React.FC = () => {
   const [assignSubmitting, setAssignSubmitting] = useState(false);
   const [assignFormError, setAssignFormError] = useState<string | null>(null);
 
+  const navigate = useNavigate();
+  const [memberSearchQuery, setMemberSearchQuery] = useState('');
+  const [memberSearchResults, setMemberSearchResults] = useState<any[]>([]);
+  const [memberSearchLoading, setMemberSearchLoading] = useState(false);
+  const [memberSearchError, setMemberSearchError] = useState<string | null>(null);
+
   const filteredSets = useMemo(() => {
     const s = qSet.trim().toLowerCase();
     if (!s) return sets;
@@ -59,7 +66,13 @@ const Executives: React.FC = () => {
         created_at: x.created_at,
         updated_at: x.updated_at,
         executives: Array.isArray(x.executives) ? x.executives.map((e: any) => ({
-          id: Number(e.id), member_id: String(e.member_id), executive_set_id: Number(e.executive_set_id), position: String(e.position || ''), created_at: e.created_at, updated_at: e.updated_at,
+          id: Number(e.id),
+          member_id: String(e.member_id),
+          executive_set_id: Number(e.executive_set_id),
+          position: String(e.position || ''),
+          created_at: e.created_at,
+          updated_at: e.updated_at,
+          executive_office_id: e.executive_office_id ? Number(e.executive_office_id) : (e.office_id ? Number(e.office_id) : undefined),
         })) : [],
       }));
       setSets(normalized);
@@ -88,7 +101,41 @@ const Executives: React.FC = () => {
   const openCreateSet = () => { setEditingSet(null); setSetForm({ name: '', start_date: '', end_date: '' }); setSetFormError(null); setShowSetModal(true); };
   const openEditOffice = (o: ExecOffice) => { setEditingOffice(o); setOfficeForm({ name: o.name || '', description: o.description || '', rank: String(o.rank ?? '') }); setOfficeFormError(null); setShowOfficeModal(true); };
   const openCreateOffice = () => { setEditingOffice(null); setOfficeForm({ name: '', description: '', rank: '' }); setOfficeFormError(null); setShowOfficeModal(true); };
-  const openAssign = (setId?: number) => { setAssignForm({ member_id: '', office_id: '' as any, executive_set_id: (setId ?? '') as any, position: '' }); setAssignFormError(null); setShowAssignModal(true); };
+  const openAssign = (setId?: number) => {
+    setAssignForm({ member_id: '', office_id: '' as any, executive_set_id: (setId ?? '') as any, position: '' });
+    setAssignFormError(null);
+    setMemberSearchQuery('');
+    setMemberSearchResults([]);
+    setMemberSearchError(null);
+    setShowAssignModal(true);
+  };
+
+  const searchMembers = async (q: string) => {
+    const term = q.trim();
+    if (term.length < 3) {
+      setMemberSearchResults([]);
+      setMemberSearchError(null);
+      return;
+    }
+    setMemberSearchLoading(true);
+    setMemberSearchError(null);
+    try {
+      const res = await apiFetch<any>(`/api/members/search/M-${encodeURIComponent(term)}`);
+      const raw = Array.isArray(res)
+        ? res
+        : Array.isArray(res?.data)
+          ? res.data
+          : Array.isArray(res?.data?.data)
+            ? res.data.data
+            : [];
+      setMemberSearchResults(raw);
+    } catch (e: any) {
+      setMemberSearchError(e?.message || 'Search failed');
+      setMemberSearchResults([]);
+    } finally {
+      setMemberSearchLoading(false);
+    }
+  };
 
   const submitSet = async () => {
     if (!setForm.name.trim() || !setForm.start_date || !setForm.end_date) { setSetFormError('All fields are required'); return; }
@@ -180,34 +227,24 @@ const Executives: React.FC = () => {
                 <tr>
                   <th className="text-left px-3 py-2">Name</th>
                   <th className="text-left px-3 py-2">Dates</th>
-                  <th className="text-left px-3 py-2">Executives</th>
                   <th className="text-right px-3 py-2">Actions</th>
                 </tr>
               </thead>
               <tbody>
-                {loadingSets && <tr><td className="px-3 py-3" colSpan={4}>Loading…</td></tr>}
+                {loadingSets && <tr><td className="px-3 py-3" colSpan={3}>Loading…</td></tr>}
                 {!loadingSets && filteredSets.map(s => (
                   <tr key={s.id} className="border-t align-top">
                     <td className="px-3 py-2">{s.name}</td>
                     <td className="px-3 py-2">{s.start_date} → {s.end_date}</td>
-                    <td className="px-3 py-2">
-                      {s.executives && s.executives.length > 0 ? (
-                        <div className="space-y-1">
-                          {s.executives.map(e => (
-                            <div key={e.id} className="text-xs text-gray-700 border rounded px-2 py-1">{e.position} • {e.member_id}</div>
-                          ))}
-                        </div>
-                      ) : <span className="text-gray-500">None</span>}
-                    </td>
                     <td className="px-3 py-2 text-right">
                       <div className="flex gap-2 justify-end">
-                        <button onClick={()=>openAssign(s.id)} className="px-2 py-1 rounded-md bg-indigo-600 text-white">Assign Member</button>
+                        <button onClick={()=>navigate(`/admin/management/executives/${s.id}`)} className="px-2 py-1 rounded-md border text-xs">View</button>
                       </div>
                     </td>
                   </tr>
                 ))}
                 {!loadingSets && filteredSets.length === 0 && (
-                  <tr><td className="px-3 py-3" colSpan={4}>No executive sets</td></tr>
+                  <tr><td className="px-3 py-3" colSpan={3}>No executive sets</td></tr>
                 )}
               </tbody>
             </table>
@@ -229,17 +266,15 @@ const Executives: React.FC = () => {
               <thead className="bg-gray-50">
                 <tr>
                   <th className="text-left px-3 py-2">Name</th>
-                  <th className="text-left px-3 py-2">Rank</th>
                   <th className="text-left px-3 py-2">Description</th>
                   <th className="text-right px-3 py-2">Actions</th>
                 </tr>
               </thead>
               <tbody>
-                {loadingOffices && <tr><td className="px-3 py-3" colSpan={4}>Loading…</td></tr>}
+                {loadingOffices && <tr><td className="px-3 py-3" colSpan={3}>Loading…</td></tr>}
                 {!loadingOffices && filteredOffices.map(o => (
                   <tr key={o.id} className="border-t">
                     <td className="px-3 py-2">{o.name}</td>
-                    <td className="px-3 py-2">{o.rank ?? '-'}</td>
                     <td className="px-3 py-2">{o.description || '-'}</td>
                     <td className="px-3 py-2 text-right">
                       <div className="flex gap-2 justify-end">
@@ -250,13 +285,15 @@ const Executives: React.FC = () => {
                   </tr>
                 ))}
                 {!loadingOffices && filteredOffices.length === 0 && (
-                  <tr><td className="px-3 py-3" colSpan={4}>No executive offices</td></tr>
+                  <tr><td className="px-3 py-3" colSpan={3}>No executive offices</td></tr>
                 )}
               </tbody>
             </table>
           </div>
         </div>
       </div>
+
+      {/* Detailed view now handled by ExecutiveSetDetail page */}
 
       <Modal
         open={showSetModal}
@@ -324,8 +361,49 @@ const Executives: React.FC = () => {
       >
         <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
           <div className="md:col-span-2">
-            <label className="block text-xs text-gray-600 mb-1">Member ID</label>
-            <input value={assignForm.member_id} onChange={(e)=>setAssignForm({...assignForm, member_id: e.target.value})} className="w-full px-3 py-2 border rounded-md" disabled={assignSubmitting} />
+            <label className="block text-xs text-gray-600 mb-1">Member ID / Search</label>
+            <input
+              value={memberSearchQuery}
+              onChange={(e)=>{
+                const v = e.target.value;
+                setMemberSearchQuery(v);
+                setAssignForm({...assignForm, member_id: v});
+                void searchMembers(v);
+              }}
+              className="w-full px-3 py-2 border rounded-md"
+              disabled={assignSubmitting}
+              placeholder="Type membership ID to search (min 3 characters)"
+            />
+            {memberSearchError && (
+              <div className="mt-1 text-[11px] text-red-600">{memberSearchError}</div>
+            )}
+            {memberSearchLoading && (
+              <div className="mt-1 text-[11px] text-gray-500">Searching…</div>
+            )}
+            {!memberSearchLoading && memberSearchResults.length > 0 && (
+              <div className="mt-1 max-h-40 overflow-y-auto border rounded-md divide-y text-xs bg-white">
+                {memberSearchResults.map((m: any) => (
+                  <button
+                    key={m.id || m.user_id || m.email}
+                    type="button"
+                    onClick={() => {
+                      const uuid = m.id || m.uuid || m.user_uuid;
+                      const text = String(uuid || '');
+                      setAssignForm({...assignForm, member_id: text});
+                      setMemberSearchQuery(text);
+                    }}
+                    className="w-full text-left px-3 py-1.5 hover:bg-indigo-50"
+                  >
+                    <div className="font-medium">{m.name || m.full_name || m.surname || m.email}</div>
+                    <div className="text-[11px] text-gray-500">Membership No: {m.membership_no || m.membership_id || m.member_id || ''}</div>
+                    {m.id && (
+                      <div className="text-[11px] text-gray-500">UUID: {m.id}</div>
+                    )}
+                    {m.email && (<div className="text-[11px] text-gray-500">{m.email}</div>)}
+                  </button>
+                ))}
+              </div>
+            )}
           </div>
           <div>
             <label className="block text-xs text-gray-600 mb-1">Executive Set</label>
