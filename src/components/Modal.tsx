@@ -12,12 +12,15 @@ type ModalProps = {
   bodyClassName?: string;
 };
 
-const Modal: React.FC<ModalProps> = ({ open, title, children, onClose, onConfirm, confirmText = 'OK', closeText = 'Close', panelClassName = '', bodyClassName = '' }) => {
+const Modal: React.FC<ModalProps> = ({ open, title, children, onClose, onConfirm, confirmText = 'OK', closeText = 'Close', panelClassName, bodyClassName = '' }) => {
   if (!open) return null;
+  const panelClasses = panelClassName && panelClassName.trim().length > 0
+    ? panelClassName
+    : 'w-full max-w-sm';
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center">
       <div className="absolute inset-0 bg-black/40" onClick={onClose} />
-      <div className={`relative bg-white rounded-lg shadow-lg w-full max-w-sm p-5 ${panelClassName}`}>
+      <div className={`relative bg-white rounded-lg shadow-lg p-5 ${panelClasses}`}>
         <div className="text-sm font-semibold text-gray-800 mb-2">{title}</div>
         {children && <div className={`text-sm text-gray-600 mb-4 ${bodyClassName}`}>{children}</div>}
         <div className="flex justify-end gap-2">

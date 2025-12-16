@@ -1,19 +1,41 @@
-import React, { useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import Modal from '../../components/Modal';
-import { AdminStore } from '../../utils/adminStore';
+import { apiFetch } from '../../utils/api';
 
 const RolesPage: React.FC = () => {
   const navigate = useNavigate();
   const [q, setQ] = useState('');
-  const [items, setItems] = useState(AdminStore.listRoles());
+  const [items, setItems] = useState<Array<{ id: string | number; name: string; created_at?: string | null }>>([]);
   const [sort, setSort] = useState<'name'|'date'>('name');
   const [modal, setModal] = useState<{open:boolean;title:string;message?:string;onConfirm?:()=>void}>({open:false,title:''});
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  const loadRoles = async () => {
+    setLoading(true); setError(null);
+    try {
+      const res = await apiFetch<any>('/api/access/roles');
+      const data = Array.isArray(res?.data) ? res.data : Array.isArray(res) ? res : [];
+      const normalized = data.map((r: any) => ({
+        id: r.id,
+        name: String(r.name || ''),
+        created_at: r.created_at ?? null,
+      }));
+      setItems(normalized);
+    } catch (e: any) {
+      setError(e?.message || 'Failed to load roles');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  useEffect(() => { void loadRoles(); }, []);
 
   const filtered = useMemo(() => {
     const list = [...items].filter(i => i.name.toLowerCase().includes(q.toLowerCase()));
     if (sort === 'name') list.sort((a,b)=>a.name.localeCompare(b.name));
-    if (sort === 'date') list.sort((a,b)=>a.createdAt.localeCompare(b.createdAt));
+    if (sort === 'date') list.sort((a,b)=>String(a.created_at || '').localeCompare(String(b.created_at || '')));
     return list;
   }, [items, q, sort]);
 
@@ -24,29 +46,20 @@ const RolesPage: React.FC = () => {
       open: true,
       title: 'Add Role',
       placeholder: 'Enter role name',
-      onSave: (v: string) => { if (!v.trim()) return; AdminStore.createRole(v.trim()); setItems(AdminStore.listRoles()); setInputModal({ open: false, title: '' }); },
-    });
-  };
-
-  const editRole = (id: string) => {
-    const curr = items.find(x=>x.id===id);
-    if (!curr) return;
-    setInputModal({
-      open: true,
-      title: 'Edit Role',
-      initial: curr.name,
-      placeholder: 'Role name',
-      onSave: (v: string) => { if (!v.trim()) return; AdminStore.updateRole({ ...curr, name: v.trim() }); setItems(AdminStore.listRoles()); setInputModal({ open: false, title: '' }); },
-    });
-  };
-
-  const confirmDelete = (id: string) => {
-    const m = items.find(x=>x.id===id);
-    setModal({
-      open: true,
-      title: 'Are you sure?',
-      message: `This will permanently delete ${m?.name}.`,
-      onConfirm: () => { AdminStore.deleteRole(id); setItems(AdminStore.listRoles()); setModal({open:false,title:''}); }
+      onSave: async (v: string) => {
+        const name = v.trim();
+        if (!name) return;
+        try {
+          await apiFetch('/api/access/roles', {
+            method: 'POST',
+            body: { name },
+          });
+          await loadRoles();
+          setInputModal({ open: false, title: '' });
+        } catch (e: any) {
+          setModal({ open:true, title:'Error', message: e?.message || 'Failed to create role.' });
+        }
+      },
     });
   };
 
@@ -64,6 +77,9 @@ const RolesPage: React.FC = () => {
           <button onClick={addRole} className="px-3 py-2 bg-indigo-600 text-white rounded-md text-sm">+ Add Role</button>
         </div>
       </div>
+      {error && (
+        <div className="p-3 border rounded-md bg-red-50 text-red-700 border-red-200 text-sm">{error}</div>
+      )}
       <div className="bg-white border rounded-xl">
         <table className="w-full text-sm">
           <thead>
@@ -77,11 +93,9 @@ const RolesPage: React.FC = () => {
             {filtered.map((m)=> (
               <tr key={m.id} className="border-t">
                 <td className="p-3">{m.name}</td>
-                <td className="p-3">{m.createdAt}</td>
+                <td className="p-3">{m.created_at || '-'}</td>
                 <td className="p-3 space-x-2">
                   <button onClick={()=>navigate(`/admin/roles/${m.id}`)} className="px-2 py-1 text-xs border rounded">👁️</button>
-                  <button onClick={()=>editRole(m.id)} className="px-2 py-1 text-xs border rounded">✏️</button>
-                  <button onClick={()=>confirmDelete(m.id)} className="px-2 py-1 text-xs bg-red-500 text-white rounded">🗑️</button>
                 </td>
               </tr>
             ))}

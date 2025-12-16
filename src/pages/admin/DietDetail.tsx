@@ -1,9 +1,9 @@
 import React, { useMemo, useState, useEffect } from 'react';
 import { Link, useNavigate, useParams } from 'react-router-dom';
 import Modal from '../../components/Modal';
-import { AdminStore } from '../../utils/adminStore';
 import StatusPill from '../../components/StatusPill';
 import { apiFetch } from '../../utils/api';
+import { AdminStore } from '../../utils/adminStore';
 
 const AdminDietDetail: React.FC = () => {
   const { id } = useParams();
@@ -19,14 +19,9 @@ const AdminDietDetail: React.FC = () => {
   const [confirm, setConfirm] = useState<{open:boolean; title:string; message?:string; onConfirm?:()=>void}>({open:false,title:''});
   const [accQ, setAccQ] = useState('');
   const [accSort, setAccSort] = useState<'name'|'email'>('name');
-  const [subQ, setSubQ] = useState('');
-  const [subStatus, setSubStatus] = useState<'all'|'submitted'|'approved'|'rejected'|'pending'>('all');
-  const [addByMemberOpen, setAddByMemberOpen] = useState(false);
-  const [memberLookup, setMemberLookup] = useState<{ id: string; result?: any; error?: string }>({ id: '' });
-  const [accView, setAccView] = useState<{ open:boolean; name?:string; email?:string; metrics?: {assigned:number; accessed:number; pending:number; failed:number; passed:number; repeating:number} }>({ open:false });
+  const [logbookQ, setLogbookQ] = useState('');
+  const [logbookStatus, setLogbookStatus] = useState<'all'|'in_progress'|'submitted'|'graded'|'failed'|'repeating'>('all');
   const [version, setVersion] = useState(0);
-  const [reduceModal, setReduceModal] = useState<{ open:boolean; accessorId?: string; count: string }>({ open:false, count: '1' });
-  const [assignedOverrides, setAssignedOverrides] = useState<Record<string, number>>({});
 
   useEffect(() => {
     let ignore = false;
@@ -34,15 +29,8 @@ const AdminDietDetail: React.FC = () => {
       if (!id) return;
       setDietLoading(true); setDietError(null);
       try {
-        let res = await apiFetch<any>(`/api/logbook-diets/${id}`);
-        let d: any = res?.data ? (Array.isArray(res.data) ? res.data.find((x:any)=> String(x.id)===String(id)) || res.data[0] : res.data) : res;
-        if (!d || !d.id) {
-          try {
-            const listRes = await apiFetch<any>('/api/logbook-diets');
-            const raw = Array.isArray(listRes) ? listRes : Array.isArray(listRes?.data) ? listRes.data : Array.isArray(listRes?.data?.data) ? listRes.data.data : [];
-            d = raw.find((x:any) => String(x.id) === String(id)) || null;
-          } catch {}
-        }
+        const res = await apiFetch<any>(`/api/logbook-diets/${id}`);
+        const d = res?.data ? (Array.isArray(res.data) ? res.data[0] : res.data) : res;
         if (!ignore) setDietData(d || null);
       } catch (e: any) {
         if (!ignore) setDietError(e?.message || 'Failed to load diet');
@@ -54,39 +42,159 @@ const AdminDietDetail: React.FC = () => {
     return () => { ignore = true; };
   }, [id]);
 
-  const diet = useMemo(() => {
-    if (dietData) return dietData;
-    return AdminStore.listDiets().find(d=>d.id===id);
-  }, [dietData, id, version]);
-  const accessors = useMemo(() => {
-    if (!diet) return [];
-    const accessorIds: string[] = Array.isArray((diet as any).accessorIds) ? (diet as any).accessorIds : [];
-    return AdminStore.listAccessors().filter(a => accessorIds.includes(a.id));
-  }, [diet, version]);
-  const assignmentMap = useMemo(() => diet ? AdminStore.getDietAssignmentsFor(diet.id) : ({} as Record<string,string[]>), [diet, version]);
-  const logs = AdminStore.listLogs();
-
-  // Initialize or preserve UI-level assigned counts
-  useEffect(() => {
-    const base: Record<string, number> = {};
-    accessors.forEach(a => { base[a.id] = Math.max(20, (assignmentMap[a.id] || []).length); });
-    setAssignedOverrides(prev => {
-      const next: Record<string, number> = { ...base };
-      Object.keys(prev).forEach(aid => { if (aid in next) next[aid] = Math.max(20, prev[aid]); });
-      return next;
-    });
-  }, [diet?.id, accessors.map(a=>a.id).join(','), JSON.stringify(assignmentMap)]);
-
-  const computeMetricsForAccessor = (accessorId: string, dietId: string) => {
-    const dietLogs = logs.filter(l => l.dietId === dietId);
-    const pending = dietLogs.filter(l=>l.status==='pending').length;
-    const passed = dietLogs.filter(l=>l.status==='approved').length;
-    const failed = dietLogs.filter(l=>l.status==='rejected').length;
-    const accessed = dietLogs.filter(l=>l.status!=='pending').length;
-    const assigned = Math.max(20, (assignedOverrides[accessorId] ?? (assignmentMap[accessorId] || []).length));
-    const repeating = 0;
-    return { assigned, accessed, pending, failed, passed, repeating };
+  const autoAssignLogbooks = async () => {
+    if (!diet?.id) return;
+    const first = assessorRows[0];
+    if (!first || !first.id) {
+      setInfo({ open:true, title:'Auto-Assign Logbooks', message:'No assessor is assigned to this diet yet.' });
+      return;
+    }
+    try {
+      const res = await apiFetch<any>('/api/assessors/auto-assign-logbooks', {
+        method: 'POST',
+        body: { assessor_id: first.id, diet_id: diet.id },
+      });
+      const msg =
+        (typeof res?.message === 'string' && res.message) ||
+        (typeof res?.data?.message === 'string' && res.data.message) ||
+        'Logbooks auto-assigned to assessor.';
+      setInfo({ open:true, title:'Auto-Assign Logbooks', message: msg });
+      setVersion(v=>v+1);
+    } catch (e: any) {
+      setInfo({ open:true, title:'Auto-Assign Logbooks', message: e?.message || 'Failed to auto-assign logbooks.' });
+    }
   };
+
+  const diet = useMemo(() => dietData, [dietData, version]);
+
+  const logbooks: any[] = useMemo(
+    () => (Array.isArray((diet as any)?.logbooks) ? (diet as any).logbooks : []),
+    [diet],
+  );
+  const applications: any[] = useMemo(
+    () => (Array.isArray((diet as any)?.applications) ? (diet as any).applications : []),
+    [diet],
+  );
+  const [assessorRows, setAssessorRows] = useState<any[]>([]);
+
+  const applicationByUserId = useMemo(() => {
+    const map: Record<string, any> = {};
+    applications.forEach((a) => { if (a && a.user_id) map[String(a.user_id)] = a; });
+    return map;
+  }, [applications]);
+
+  const assessorNameById = useMemo(() => {
+    const map: Record<string, string> = {};
+    assessorRows.forEach((a) => {
+      const fullName = `${a.member?.title || ''} ${a.member?.surname || ''} ${a.member?.firstname || ''}`.trim();
+      if (!fullName) return;
+      if (a.id) map[String(a.id)] = fullName;
+      if (a.member?.id) map[String(a.member.id)] = fullName;
+    });
+    return map;
+  }, [assessorRows]);
+
+  const [supervisorNameById, setSupervisorNameById] = useState<Record<string, string>>({});
+
+  const stats = useMemo(() => {
+    const totalLogbooks = logbooks.length;
+    const totalApplications = applications.length;
+    const passed = logbooks.filter((l) => String(l.status).toLowerCase() === 'graded' || String(l.status).toLowerCase() === 'passed').length;
+    const failed = logbooks.filter((l) => String(l.status).toLowerCase() === 'failed' || String(l.status).toLowerCase() === 'rejected').length;
+    const repeating = logbooks.filter((l) => String(l.status).toLowerCase() === 'repeating').length;
+    return { totalLogbooks, totalApplications, passed, failed, repeating };
+  }, [logbooks, applications]);
+
+  useEffect(() => {
+    const raw = Array.isArray((diet as any)?.assessors) ? (diet as any).assessors : [];
+    if (!raw.length) {
+      setAssessorRows([]);
+      return;
+    }
+    let ignore = false;
+    const loadAssessors = async () => {
+      try {
+        const ids = Array.from(
+          new Set(
+            raw
+              .map((a: any) => (a && (a.assessor_id || a.id) ? String(a.assessor_id || a.id) : ''))
+              .filter(Boolean),
+          ),
+        ) as string[];
+        const fetched = await Promise.all(
+          ids.map(async (assessorId) => {
+            try {
+              const res = await apiFetch<any>(`/api/assessors/${encodeURIComponent(String(assessorId))}`);
+              return res?.data || res || null;
+            } catch {
+              return null;
+            }
+          }),
+        );
+        const byId: Record<string, any> = {};
+        fetched.forEach((r) => {
+          if (r && r.id) byId[String(r.id)] = r;
+        });
+        const merged = raw.map((a: any) => {
+          const key = String(a.assessor_id || a.id || '');
+          const full = key ? byId[key] : undefined;
+          return full ? { ...full } : a;
+        });
+        if (!ignore) setAssessorRows(merged);
+      } catch {
+        if (!ignore) setAssessorRows(raw);
+      }
+    };
+    void loadAssessors();
+    return () => {
+      ignore = true;
+    };
+  }, [diet]);
+
+  useEffect(() => {
+    const ids = Array.from(
+      new Set(
+        logbooks
+          .map((lb: any) => (lb && lb.supervisor_id ? String(lb.supervisor_id) : ''))
+          .filter(Boolean),
+      ),
+    ) as string[];
+    if (!ids.length) {
+      setSupervisorNameById({});
+      return;
+    }
+    let ignore = false;
+    const loadSupervisors = async () => {
+      try {
+        const fetched = await Promise.all(
+          ids.map(async (memberId) => {
+            try {
+              const res = await apiFetch<any>(`/api/members/${encodeURIComponent(String(memberId))}`);
+              const data = res?.data || res || null;
+              return { id: memberId, data };
+            } catch {
+              return { id: memberId, data: null };
+            }
+          }),
+        );
+        if (ignore) return;
+        const map: Record<string, string> = {};
+        fetched.forEach((item) => {
+          const d = item.data;
+          if (!d) return;
+          const fullName = `${d.title || ''} ${d.surname || ''} ${d.firstname || ''}`.trim();
+          if (fullName) map[item.id] = fullName;
+        });
+        setSupervisorNameById(map);
+      } catch {
+        if (!ignore) setSupervisorNameById({});
+      }
+    };
+    void loadSupervisors();
+    return () => {
+      ignore = true;
+    };
+  }, [logbooks]);
 
   if (dietLoading) return (
     <div className="space-y-4">
@@ -108,15 +216,36 @@ const AdminDietDetail: React.FC = () => {
     </div>
   );
 
-  const stats = {
-    accessors: accessors.length,
-    submitted: logs.filter(l=>l.status==='submitted').length,
-    approved: logs.filter(l=>l.status==='approved').length,
-    rejected: logs.filter(l=>l.status==='rejected').length,
+  const isActive = Boolean((diet as any)?.is_active) || String((diet as any)?.status || '').toLowerCase() === 'active';
+
+  const closeDiet = () => {
+    if (!id) return;
+    setConfirm({
+      open: true,
+      title: 'Close Diet?',
+      message: `Are you sure you want to close ${diet.title || ''}?`,
+      onConfirm: async () => {
+        try {
+          await apiFetch(`/api/logbook-diets/${encodeURIComponent(String(id))}/close`, { method: 'POST' });
+          setVersion((v) => v + 1);
+        } catch (e: any) {
+          setInfo({ open: true, title: 'Error', message: e?.message || 'Failed to close diet.' });
+        } finally {
+          setConfirm({ open: false, title: '' });
+        }
+      },
+    });
   };
 
-  const closeDiet = () => setConfirm({ open:true, title:'Close Diet?', message:`Are you sure you want to close ${diet.sessionName} - ${diet.diet}?`, onConfirm:()=>{ AdminStore.setDietStatus(diet.id,'closed'); setConfirm({open:false,title:''}); setVersion(v=>v+1); }});
-  const openDiet = () => { AdminStore.setDietStatus(diet.id,'open'); setVersion(v=>v+1); };
+  const openDiet = async () => {
+    if (!id) return;
+    try {
+      await apiFetch(`/api/logbook-diets/${encodeURIComponent(String(id))}/reopen`, { method: 'POST' });
+      setVersion((v) => v + 1);
+    } catch (e: any) {
+      setInfo({ open: true, title: 'Error', message: e?.message || 'Failed to reopen diet.' });
+    }
+  };
 
   return (
     <div className="space-y-5">
@@ -124,73 +253,84 @@ const AdminDietDetail: React.FC = () => {
         <div className="flex items-center gap-3">
           <button onClick={()=>navigate(-1)} className="px-2 py-1 border rounded">← Back</button>
           <div>
-            <div className="text-2xl font-semibold">{diet.sessionName ? `${diet.sessionName} - ${diet.diet}` : diet.title}</div>
-            <div className="text-sm text-gray-500">{diet.year ? `Year ${diet.year} • Starts ${diet.startDate}` : `Starts ${diet.start_date} • Ends ${diet.end_date}`}</div>
+            <div className="text-2xl font-semibold">{diet.title}</div>
+            <div className="text-sm text-gray-500">{diet.start_date} – {diet.end_date}</div>
           </div>
         </div>
         <div className="space-x-2 flex items-center">
-          {diet.status === 'closed' ? (
-            <span className="text-xs px-2 py-0.5 rounded bg-red-50 text-red-700">Closed</span>
+          {isActive ? (
+            <span className="text-xs px-2 py-0.5 rounded bg-emerald-50 text-emerald-700">Active</span>
           ) : (
-            accessors.length>0 && (<span className="text-xs px-2 py-0.5 rounded bg-emerald-50 text-emerald-700">Started</span>)
+            <span className="text-xs px-2 py-0.5 rounded bg-gray-100 text-gray-600">Inactive</span>
           )}
-          {diet.status === 'open' && (
+          {isActive && (
             <button onClick={closeDiet} className="px-3 py-1.5 text-sm border rounded-md border-red-300 text-red-700">Close Diet</button>
           )}
-          {diet.status === 'closed' && (
+          {!isActive && (
             <button onClick={openDiet} className="px-3 py-1.5 text-sm border rounded-md border-green-300 text-green-700">Reopen Diet</button>
           )}
           <button onClick={()=>setAssignOpen(true)} className="px-3 py-1.5 text-sm bg-indigo-600 text-white rounded-md">Start Assessment / Assign Accessor</button>
         </div>
       </div>
 
-      <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
-        <Stat title="Accessors" value={stats.accessors} />
-        <Stat title="Submitted" value={stats.submitted} />
-        <Stat title="Approved" value={stats.approved} />
-        <Stat title="Rejected" value={stats.rejected} />
+      <div className="grid grid-cols-2 sm:grid-cols-6 gap-3">
+        <Stat title="Accessors" value={assessorRows.length} />
+        <Stat title="Logbooks" value={stats.totalLogbooks} />
+        <Stat title="Applications" value={stats.totalApplications} />
+        <Stat title="Passed" value={stats.passed} />
+        <Stat title="Failed" value={stats.failed} />
+        <Stat title="Repeating" value={stats.repeating} />
       </div>
 
       <section className="border rounded-xl bg-white">
         <div className="p-3 text-sm font-medium border-b flex items-center justify-between">
-          <span>Assigned Accessors</span>
+          <span>Assessors for this Diet</span>
           <div className="flex items-center gap-2">
             <input value={accQ} onChange={e=>setAccQ(e.target.value)} placeholder="Search" className="px-2 py-1 border rounded text-xs" />
             <select value={accSort} onChange={e=>setAccSort(e.target.value as any)} className="px-2 py-1 border rounded text-xs">
               <option value="name">Sort: Name</option>
               <option value="email">Sort: Email</option>
             </select>
-            <button onClick={()=>{ setAddByMemberOpen(true); setMemberLookup({ id:'' }); }} className="px-2 py-1 border rounded text-xs">Add by Membership ID</button>
+            <button onClick={autoAssignLogbooks} className="px-2 py-1 border rounded text-xs">Auto-Assign Logbooks</button>
           </div>
         </div>
         <div className="p-3 overflow-x-auto">
           <table className="w-full text-sm">
             <thead>
               <tr className="text-left">
+                <th className="p-2">Membership No</th>
                 <th className="p-2">Name</th>
                 <th className="p-2">Email</th>
-                <th className="p-2">Students Assigned</th>
-                <th className="p-2">Actions</th>
+                <th className="p-2">Max Workload</th>
+                <th className="p-2">Action</th>
               </tr>
             </thead>
             <tbody>
-              {accessors
-                 .filter(a => `${a.name} ${a.email}`.toLowerCase().includes(accQ.toLowerCase()))
-                 .sort((a,b)=> accSort==='name'? a.name.localeCompare(b.name) : a.email.localeCompare(b.email))
-                 .map(a => (
-                <tr key={a.id} className="border-t">
-                  <td className="p-2">{a.name}</td>
-                  <td className="p-2">{a.email}</td>
-                  <td className="p-2">{Math.max(20, (assignedOverrides[a.id] ?? (assignmentMap[a.id] || []).length))}</td>
-                  <td className="p-2 space-x-2">
-                    <button onClick={()=>{ setAccView({ open:true, name:a.name, email:a.email, metrics: computeMetricsForAccessor(a.id, diet.id) }); }} className="px-2 py-1 text-xs border rounded">View</button>
-                    <button onClick={()=>{ setReduceModal({ open:true, accessorId: a.id, count: '1' }); }} className="px-2 py-1 text-xs border rounded">Reduce Number</button>
-                    <button onClick={()=>{ AdminStore.unassignAccessorFromDiet(diet.id, a.id); AdminStore.distributeDietStudents(diet.id); setVersion(v=>v+1); }} className="px-2 py-1 text-xs border rounded">Unassign</button>
-                  </td>
-                </tr>
-              ))}
-              {accessors.length===0 && (
-                <tr><td className="p-2 text-xs text-gray-500" colSpan={4}>No accessors assigned yet.</td></tr>
+              {assessorRows
+                .filter((a) => `${a.member?.membership_no || ''} ${a.member?.surname || ''} ${a.member?.firstname || ''} ${a.member?.email || ''}`.toLowerCase().includes(accQ.toLowerCase()))
+                .sort((a, b) => {
+                  const aName = `${a.member?.surname || ''} ${a.member?.firstname || ''}`.trim();
+                  const bName = `${b.member?.surname || ''} ${b.member?.firstname || ''}`.trim();
+                  return accSort === 'name' ? aName.localeCompare(bName) : String(a.member?.email || '').localeCompare(String(b.member?.email || ''));
+                })
+                .map((a) => (
+                  <tr key={a.id} className="border-t">
+                    <td className="p-2">{a.member?.membership_no || '-'}</td>
+                    <td className="p-2">{`${a.member?.title || ''} ${a.member?.surname || ''} ${a.member?.firstname || ''}`.trim() || '-'}</td>
+                    <td className="p-2">{a.member?.email || '-'}</td>
+                    <td className="p-2">{a.max_workload ?? '-'}</td>
+                    <td className="p-2">
+                      <button
+                        className="px-2 py-1 text-xs border rounded"
+                        onClick={() => navigate(`/admin/logbook/assessors/${encodeURIComponent(String(a.id))}/logbooks`)}
+                      >
+                        View
+                      </button>
+                    </td>
+                  </tr>
+                ))}
+              {assessorRows.length === 0 && (
+                <tr><td className="p-2 text-xs text-gray-500" colSpan={5}>No assessors assigned yet.</td></tr>
               )}
             </tbody>
           </table>
@@ -199,15 +339,16 @@ const AdminDietDetail: React.FC = () => {
 
       <section className="border rounded-xl bg-white">
         <div className="p-3 text-sm font-medium border-b flex items-center justify-between">
-          <span>Submissions</span>
+          <span>Logbooks</span>
           <div className="flex items-center gap-2">
-            <input value={subQ} onChange={e=>setSubQ(e.target.value)} placeholder="Search" className="px-2 py-1 border rounded text-xs" />
-            <select value={subStatus} onChange={e=>setSubStatus(e.target.value as any)} className="px-2 py-1 border rounded text-xs">
+            <input value={logbookQ} onChange={e=>setLogbookQ(e.target.value)} placeholder="Search" className="px-2 py-1 border rounded text-xs" />
+            <select value={logbookStatus} onChange={e=>setLogbookStatus(e.target.value as any)} className="px-2 py-1 border rounded text-xs">
               <option value="all">All</option>
+              <option value="in_progress">In Progress</option>
               <option value="submitted">Submitted</option>
-              <option value="approved">Approved</option>
-              <option value="rejected">Rejected</option>
-              <option value="pending">Pending</option>
+              <option value="graded">Graded</option>
+              <option value="failed">Failed</option>
+              <option value="repeating">Repeating</option>
             </select>
           </div>
         </div>
@@ -216,31 +357,71 @@ const AdminDietDetail: React.FC = () => {
             <thead>
               <tr className="text-left">
                 <th className="p-2">Student</th>
-                <th className="p-2">Week/Day</th>
+                <th className="p-2">Stage</th>
                 <th className="p-2">Status</th>
-                <th className="p-2">Actions</th>
+                <th className="p-2">Supervisor</th>
+                <th className="p-2">Assessor</th>
               </tr>
             </thead>
             <tbody>
-              {logs
-                .filter(s => [`${s.studentEmail}`, s.day, String(s.week), s.status].join(' ').toLowerCase().includes(subQ.toLowerCase()))
-                .filter(s => subStatus==='all' ? true : s.status===subStatus)
-                .map(s => (
-                <tr key={s.id} className="border-t">
-                  <td className="p-2">{s.studentEmail}</td>
-                  <td className="p-2">W{s.week} / {s.day}</td>
+              {logbooks
+                .filter(lb => {
+                  const app = applicationByUserId[String(lb.user_id)] || {};
+                  const label = `${app.surname || ''} ${app.other_names || ''} ${app.email || ''} ${lb.status || ''}`.toLowerCase();
+                  return label.includes(logbookQ.toLowerCase());
+                })
+                .filter(lb => logbookStatus === 'all' ? true : String(lb.status).toLowerCase() === logbookStatus)
+                .map((lb) => {
+                  const app = applicationByUserId[String(lb.user_id)] || {};
+                  const studentName = `${app.title || ''} ${app.surname || ''} ${app.other_names || ''}`.trim() || app.email || lb.user_id;
+                  return (
+                    <tr key={lb.id} className="border-t">
+                      <td className="p-2">
+                        <div className="text-sm text-gray-800">{studentName}</div>
+                        <div className="text-xs text-gray-500">{app.email}</div>
+                      </td>
+                      <td className="p-2">Stage {lb.stage ?? '-'}</td>
+                      <td className="p-2">
+                        <StatusPill status={String(lb.status || 'in_progress') as any} />
+                      </td>
+                      <td className="p-2">{lb.supervisor_id ? (supervisorNameById[String(lb.supervisor_id)] || '-') : '-'}</td>
+                      <td className="p-2">{lb.assessor_id ? (assessorNameById[String(lb.assessor_id)] || '-') : '-'}</td>
+                    </tr>
+                  );
+                })}
+              {logbooks.length === 0 && (
+                <tr><td className="p-2 text-xs text-gray-500" colSpan={5}>No logbooks yet.</td></tr>
+              )}
+            </tbody>
+          </table>
+        </div>
+      </section>
+
+      <section className="border rounded-xl bg-white">
+        <div className="p-3 text-sm font-medium border-b flex items-center justify-between">
+          <span>Applications in this Diet</span>
+        </div>
+        <div className="p-3 overflow-x-auto">
+          <table className="w-full text-sm">
+            <thead>
+              <tr className="text-left">
+                <th className="p-2">Applicant</th>
+                <th className="p-2">Email</th>
+                <th className="p-2">Status</th>
+              </tr>
+            </thead>
+            <tbody>
+              {applications.map((a) => (
+                <tr key={a.id} className="border-t">
+                  <td className="p-2">{`${a.title || ''} ${a.surname || ''} ${a.other_names || ''}`.trim()}</td>
+                  <td className="p-2">{a.email}</td>
                   <td className="p-2">
-                    <StatusPill status={s.status as any} />
-                  </td>
-                  <td className="p-2 space-x-2">
-                    <button onClick={()=>{ AdminStore.updateLog({ ...s, status: 'pending' as any }); }} className="px-2 py-1 text-xs border rounded">Recall Submission</button>
-                    <button onClick={()=>setSupPick({open:true, studentEmail: s.studentEmail})} className="px-2 py-1 text-xs border rounded">Assign Supervisor</button>
-                    <Link to={`/admin/logbook/diet-management/${diet.id}/submissions/${s.id}`} className="px-2 py-1 text-xs border rounded inline-block">View</Link>
+                    <StatusPill status={String(a.status || 'pending') as any} />
                   </td>
                 </tr>
               ))}
-              {logs.length===0 && (
-                <tr><td className="p-2 text-xs text-gray-500" colSpan={4}>No submissions yet.</td></tr>
+              {applications.length === 0 && (
+                <tr><td className="p-2 text-xs text-gray-500" colSpan={3}>No applications for this diet.</td></tr>
               )}
             </tbody>
           </table>
@@ -253,11 +434,8 @@ const AdminDietDetail: React.FC = () => {
         onClose={()=>{ setAssignOpen(false); setAssignQ(''); }}
         q={assignQ}
         setQ={setAssignQ}
-        onAssigned={()=>{
-          if (diet.status === 'pending') {
-            setInfo({ open:true, title:'Assessment Started', message:'Assessment has started for this diet.' });
-          }
-          AdminStore.distributeDietStudents(diet.id);
+        onAssigned={(msg)=>{
+          setInfo({ open:true, title:'Accessor Assigned', message: msg || 'Accessor assigned to this diet.' });
           setVersion(v=>v+1);
         }}
       />
@@ -268,95 +446,6 @@ const AdminDietDetail: React.FC = () => {
       <Modal open={info.open} title={info.title} onClose={()=>setInfo({open:false,title:''})}>
         {info.message}
       </Modal>
-      {addByMemberOpen && (
-        <Modal open={true} title="Add Accessor by Membership ID" onClose={()=>setAddByMemberOpen(false)} onConfirm={() => {
-          const members = JSON.parse(localStorage.getItem('membership_members') || '[]') as Array<any>;
-          const found = members.find(m => m.membershipNo === memberLookup.id.trim());
-          if (!found) { setMemberLookup(prev=>({ ...prev, error: 'Invalid membership ID' })); return; }
-          // Create accessor if not exists and assign to this diet
-          const all = AdminStore.listAccessors();
-          let target = all.find(a => a.email === found.email);
-          if (!target) {
-            target = AdminStore.createAccessor({ name: found.name, email: found.email, active: true } as any);
-          }
-          AdminStore.assignAccessorToDiet(diet.id, target.id);
-          AdminStore.distributeDietStudents(diet.id);
-          setAddByMemberOpen(false);
-          setVersion(v=>v+1);
-        }} confirmText="Add">
-          <div className="space-y-3">
-            <div>
-              <div className="text-xs font-medium text-gray-700 mb-1">Membership ID</div>
-              <input value={memberLookup.id} onChange={e=>setMemberLookup({ id: e.target.value, error: undefined })} placeholder="NIQS-YYYY-####" className="w-full px-3 py-2 border rounded-md text-sm" />
-              {memberLookup.error && <div className="text-xs text-red-600 mt-1">{memberLookup.error}</div>}
-            </div>
-            <LookupPreview membershipId={memberLookup.id} />
-          </div>
-        </Modal>
-      )}
-      {accView.open && (
-        <Modal open={true} title={`Accessor Metrics`} onClose={()=>setAccView({open:false})}>
-          <div className="space-y-3 text-sm">
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-              <Info label="Name" value={accView.name} />
-              <Info label="Email" value={accView.email} />
-            </div>
-            <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
-              <Stat title="Assigned" value={accView.metrics?.assigned || 0} />
-              <Stat title="Accessed" value={accView.metrics?.accessed || 0} />
-              <Stat title="Pending" value={accView.metrics?.pending || 0} />
-              <Stat title="Failed" value={accView.metrics?.failed || 0} />
-              <Stat title="Passed" value={accView.metrics?.passed || 0} />
-              <Stat title="Repeating" value={accView.metrics?.repeating || 0} />
-            </div>
-          </div>
-        </Modal>
-      )}
-      {reduceModal.open && (
-        <Modal
-          open={true}
-          title="Reduce Assigned Students"
-          onClose={()=>setReduceModal({ open:false, count:'1' })}
-          onConfirm={() => {
-            const aid = reduceModal.accessorId!;
-            const n = Math.max(0, Math.floor(Number(reduceModal.count)));
-            if (!aid || !n) { setReduceModal({ open:false, count:'1' }); return; }
-            const others = accessors.map(x=>x.id).filter(x=>x!==aid);
-            const baseCounts: Record<string, number> = {};
-            accessors.forEach(x => { baseCounts[x.id] = Math.max(20, (assignedOverrides[x.id] ?? (assignmentMap[x.id] || []).length)); });
-            const next = { ...baseCounts };
-            const current = next[aid] || 0;
-            const take = Math.min(n, current);
-            next[aid] = Math.max(0, current - take);
-            if (take > 0 && others.length > 0) {
-              for (let i=0; i<take; i++) {
-                const target = others[i % others.length];
-                next[target] = (next[target] || 0) + 1;
-              }
-            }
-            setAssignedOverrides(next);
-            setReduceModal({ open:false, count:'1' });
-            setInfo({ open:true, title: 'Redistribution Applied', message: `Successfully moved ${take} student(s) to other accessors.` });
-          }}
-          confirmText="Apply"
-        >
-          <div className="space-y-3">
-            <div className="text-sm">
-              Enter how many students to remove from this accessor. The counts will update visually.
-            </div>
-            <div>
-              <div className="text-xs font-medium text-gray-700 mb-1">Number</div>
-              <input
-                value={reduceModal.count}
-                onChange={e=>setReduceModal(r=>({ ...r, count: e.target.value }))}
-                type="number"
-                min={0}
-                className="w-full px-3 py-2 border rounded-md text-sm"
-              />
-            </div>
-          </div>
-        </Modal>
-      )}
     </div>
   );
 };
@@ -368,37 +457,103 @@ const Stat = ({ title, value }: { title: string; value: number }) => (
   </div>
 );
 
-const AssignAccessorModal = ({ open, dietId, q, setQ, onClose, onAssigned }: { open: boolean; dietId?: string; q: string; setQ: (v:string)=>void; onClose: ()=>void; onAssigned: ()=>void }) => {
+const AssignAccessorModal = ({ open, dietId, q, setQ, onClose, onAssigned }: { open: boolean; dietId?: string; q: string; setQ: (v:string)=>void; onClose: ()=>void; onAssigned: (msg?: string)=>void }) => {
+  const [loading, setLoading] = useState(false);
+  const [list, setList] = useState<any[]>([]);
+  const [error, setError] = useState<string | null>(null);
+  const [assigningId, setAssigningId] = useState<string | null>(null);
+
+  useEffect(() => {
+    const load = async () => {
+      if (!open || !dietId) return;
+      setLoading(true); setError(null);
+      try {
+        const res = await apiFetch<any>('/api/assessors');
+        const arr = Array.isArray(res?.data) ? res.data : Array.isArray(res) ? res : [];
+        setList(arr);
+      } catch (e: any) {
+        setError(e?.message || 'Failed to load assessors');
+      } finally {
+        setLoading(false);
+      }
+    };
+    void load();
+  }, [open, dietId]);
+
   if (!open || !dietId) return null;
-  const accessors = AdminStore.listAccessors();
-  const filtered = accessors.filter(a => `${a.name} ${a.email}`.toLowerCase().includes(q.toLowerCase()));
-  const assign = (aid: string) => { AdminStore.assignAccessorToDiet(dietId, aid); onAssigned(); onClose(); };
+
+  const filtered = list.filter((a) => {
+    const name = `${a.member?.surname || ''} ${a.member?.firstname || ''}`;
+    const email = a.member?.email || '';
+    const membership = a.member?.membership_no || '';
+    return `${name} ${email} ${membership}`.toLowerCase().includes(q.toLowerCase());
+  });
+
+  const assign = async (assessorId: string) => {
+    if (!dietId) return;
+    setAssigningId(assessorId);
+    try {
+      const res = await apiFetch<any>('/api/assessors/assign-to-diet', {
+        method: 'POST',
+        body: { assessor_id: assessorId, diet_id: dietId },
+      });
+      const msg =
+        (typeof res?.message === 'string' && res.message) ||
+        (typeof res?.data?.message === 'string' && res.data.message) ||
+        'Accessor assignment updated.';
+      setError(null);
+      onAssigned(msg);
+      onClose();
+    } catch (e: any) {
+      setError(e?.message || 'Failed to assign assessor');
+    } finally {
+      setAssigningId(null);
+    }
+  };
+
   return (
     <Modal open={true} title="Assign Accessor" onClose={onClose} panelClassName="max-w-2xl w-[90vw] max-h-[80vh]" bodyClassName="overflow-y-auto max-h-[60vh] pr-1">
       <div className="space-y-3">
-        <input value={q} onChange={e=>setQ(e.target.value)} placeholder="Search accessors" className="w-full px-3 py-2 border rounded-md text-sm" />
+        <input value={q} onChange={e=>setQ(e.target.value)} placeholder="Search assessors" className="w-full px-3 py-2 border rounded-md text-sm" />
+        {error && <div className="text-xs text-red-600">{error}</div>}
         <div className="max-h-60 overflow-auto border rounded-md">
-          <table className="w-full text-sm">
-            <thead>
-              <tr className="text-left">
-                <th className="p-2">Name</th>
-                <th className="p-2">Email</th>
-                <th className="p-2">Action</th>
-              </tr>
-            </thead>
-            <tbody>
-              {filtered.map(a => (
-                <tr key={a.id} className="border-t">
-                  <td className="p-2">{a.name}</td>
-                  <td className="p-2">{a.email}</td>
-                  <td className="p-2"><button onClick={()=>assign(a.id)} className="px-2 py-1 text-xs bg-indigo-600 text-white rounded">Assign</button></td>
+          {loading ? (
+            <div className="p-3 text-xs text-gray-500">Loading assessors…</div>
+          ) : (
+            <table className="w-full text-sm">
+              <thead>
+                <tr className="text-left">
+                  <th className="p-2">Membership No</th>
+                  <th className="p-2">Name</th>
+                  <th className="p-2">Email</th>
+                  <th className="p-2">Action</th>
                 </tr>
-              ))}
-              {filtered.length===0 && (
-                <tr><td className="p-2 text-xs text-gray-500" colSpan={3}>No accessors match your search.</td></tr>
-              )}
-            </tbody>
-          </table>
+              </thead>
+              <tbody>
+                {filtered.map((a) => {
+                  const accessorId = a.assessor_id || a.id;
+                  return (
+                  <tr key={accessorId} className="border-t">
+                    <td className="p-2">{a.member?.membership_no || '-'}</td>
+                    <td className="p-2">{`${a.member?.title || ''} ${a.member?.surname || ''} ${a.member?.firstname || ''}`.trim() || '-'}</td>
+                    <td className="p-2">{a.member?.email || '-'}</td>
+                    <td className="p-2">
+                      <button
+                        onClick={()=>void assign(accessorId)}
+                        className="px-2 py-1 text-xs bg-indigo-600 text-white rounded disabled:opacity-60"
+                        disabled={Boolean(assigningId)}
+                      >
+                        {assigningId === accessorId ? 'Assigning…' : 'Assign'}
+                      </button>
+                    </td>
+                  </tr>
+                );})}
+                {filtered.length === 0 && !loading && (
+                  <tr><td className="p-2 text-xs text-gray-500" colSpan={4}>No assessors match your search.</td></tr>
+                )}
+              </tbody>
+            </table>
+          )}
         </div>
       </div>
     </Modal>

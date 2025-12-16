@@ -73,6 +73,9 @@ import MyApplication from './pages/admin/applications/MyApplication';
 import MyApplicationDetail from './pages/admin/applications/MyApplicationDetail';
 import MyLogbook from './pages/admin/logbook/MyLogbook';
 import AdminLogbooks from './pages/admin/logbook/Logbooks';
+import SupervisorRequests from './pages/admin/logbook/SupervisorRequests';
+import SupervisedLogbook from './pages/admin/logbook/SupervisedLogbook';
+import AssessorLogbooks from './pages/admin/logbook/AssessorLogbooks';
 
 const App: React.FC = () => {
   return (
@@ -143,6 +146,9 @@ const App: React.FC = () => {
             <Route path="logbook/diet-management/:id/submissions/:sid" element={<SubmissionDetail />} />
             <Route path="logbook/my-logbook" element={<MyLogbook />} />
             <Route path="logbook/logbooks" element={<AdminLogbooks />} />
+            <Route path="logbook/supervisor-requests" element={<SupervisorRequests />} />
+            <Route path="logbook/supervised/:logbookId" element={<SupervisedLogbook />} />
+            <Route path="logbook/assessors/:assessorId/logbooks" element={<AssessorLogbooks />} />
             <Route path="settings" element={<AdminSettings />} />
             <Route path="databank" element={<AdminDashboard />} />
           </Route>

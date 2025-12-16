@@ -1,77 +1,122 @@
-import React, { useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import Modal from '../../components/Modal';
-import { AdminStore } from '../../utils/adminStore';
+import { apiFetch } from '../../utils/api';
 
 const AdminAccessors: React.FC = () => {
   const [q, setQ] = useState('');
-  const [items, setItems] = useState(AdminStore.listAccessors());
-  const [modal, setModal] = useState<{ open: boolean; title: string; message?: string; onConfirm?: () => void }>({ open: false, title: '' });
-  const [view, setView] = useState<{ open: boolean; title: string; body?: React.ReactNode }>({ open: false, title: '' });
+  const [items, setItems] = useState<any[]>([]);
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [success, setSuccess] = useState<string | null>(null);
+
+  const [view, setView] = useState<{ open: boolean; title: string; body?: React.ReactNode }>(
+    { open: false, title: '' },
+  );
+
   const [addOpen, setAddOpen] = useState(false);
-  const [lookup, setLookup] = useState<{ id: string; result?: any; error?: string }>({ id: '' });
-  const [editOpen, setEditOpen] = useState(false);
-  const [editState, setEditState] = useState<{ id?: string; name: string; email: string }>({ name: '', email: '' });
+  const [lookup, setLookup] = useState<LookupState>({ q: '', results: [] });
+  const [lookupLoading, setLookupLoading] = useState(false);
 
-  const diets = AdminStore.listDiets();
-  const logs = AdminStore.listLogs();
-  const [dietFilter, setDietFilter] = useState<string>('all');
-  const assignedCount = (accessorId: string) => diets.filter(d=>d.accessorIds.includes(accessorId)).length;
-  const metrics = (accessorId: string) => {
-    const assignedDietIds = diets.filter(d=>d.accessorIds.includes(accessorId)).map(d=>d.id);
-    const scopeDietIds = dietFilter==='all' ? assignedDietIds : assignedDietIds.filter(id=>id===dietFilter);
-    const relevant = logs.filter(l => l.dietId && scopeDietIds.includes(l.dietId));
-    const pending = relevant.filter(l=>l.status==='pending').length;
-    const passed = relevant.filter(l=>l.status==='approved').length;
-    const failed = relevant.filter(l=>l.status==='rejected').length;
-    const accessed = relevant.filter(l=>l.status!=='pending').length;
-    const repeating = 0;
-    return { accessed, pending, failed, passed, repeating };
+  const loadAccessors = async () => {
+    setLoading(true);
+    setError(null);
+    setSuccess(null);
+    try {
+      const res = await apiFetch<any>('/api/assessors');
+      const list = Array.isArray(res?.data) ? res.data : Array.isArray(res) ? res : [];
+      setItems(list);
+    } catch (e: any) {
+      setError(e?.message || 'Failed to load accessors');
+    } finally {
+      setLoading(false);
+    }
   };
-  const filtered = useMemo(() => items.filter(i => `${i.name} ${i.email}`.toLowerCase().includes(q.toLowerCase())), [items, q]);
 
-  const openAdd = () => { setAddOpen(true); setLookup({ id: '' }); };
-  const doLookup = () => {
-    const members = JSON.parse(localStorage.getItem('membership_members') || '[]') as Array<any>;
-    const found = members.find(m => m.membershipNo === lookup.id.trim());
-    if (!found) { setLookup(prev=>({ ...prev, result: undefined, error: 'Invalid membership ID' })); return; }
-    setLookup(prev=>({ ...prev, result: found, error: undefined }));
+  useEffect(() => {
+    void loadAccessors();
+  }, []);
+
+  const filtered = useMemo(() => {
+    return items.filter((i) => {
+      const m = i.member || {};
+      const name = `${m.surname || ''} ${m.firstname || ''}`;
+      const email = m.email || '';
+      const membership = m.membership_no || '';
+      return `${name} ${email} ${membership}`.toLowerCase().includes(q.toLowerCase());
+    });
+  }, [items, q]);
+
+  const openAdd = () => {
+    setAddOpen(true);
+    setLookup({ q: '', results: [] });
   };
-  const confirmAddAccessor = () => {
-    if (!lookup.result) return;
-    AdminStore.createAccessor({ name: lookup.result.name, email: lookup.result.email });
-    setItems(AdminStore.listAccessors());
-    setAddOpen(false);
+
+  const searchMembers = async (query: string) => {
+    const trimmed = query.trim();
+    if (!trimmed) {
+      setLookup({ q: query, results: [], error: undefined });
+      return;
+    }
+    setLookupLoading(true);
+    setLookup((prev) => ({ ...prev, q: query, error: undefined }));
+    try {
+      const suffix = trimmed.toUpperCase().startsWith('M-')
+        ? trimmed.toUpperCase().slice(2)
+        : trimmed.replace(/^M-/i, '');
+      const res = await apiFetch<any>(`/api/members/search/M-${encodeURIComponent(suffix || trimmed)}`);
+      const list = Array.isArray(res?.data) ? res.data : Array.isArray(res) ? res : [];
+      setLookup((prev) => ({
+        ...prev,
+        results: list,
+        error: list.length ? undefined : 'No members found for this ID',
+      }));
+    } catch (e: any) {
+      setLookup((prev) => ({ ...prev, results: [], error: e?.message || 'Search failed' }));
+    } finally {
+      setLookupLoading(false);
+    }
   };
-  const editItem = (id: string) => {
-    const curr = items.find(x=>x.id===id); if(!curr) return;
-    setEditState({ id: curr.id, name: curr.name, email: curr.email });
-    setEditOpen(true);
+
+  const handleSelectMember = async (member: any) => {
+    if (!member || !member.id) return;
+    setLookupLoading(true);
+    try {
+      const res = await apiFetch<any>('/api/assessors', {
+        method: 'POST',
+        body: { member_id: member.id, max_workload: 100 },
+      });
+      setAddOpen(false);
+      setLookup({ q: '', results: [] });
+      await loadAccessors();
+      const msg =
+        (typeof res?.message === 'string' && res.message) ||
+        (typeof res?.data?.message === 'string' && res.data.message) ||
+        'Accessor created successfully.';
+      setSuccess(msg);
+    } catch (e: any) {
+      setLookup((prev) => ({ ...prev, error: e?.message || 'Failed to add accessor' }));
+    } finally {
+      setLookupLoading(false);
+    }
   };
-  const saveEdit = () => {
-    const curr = items.find(x=>x.id===editState.id); if(!curr) { setEditOpen(false); return; }
-    AdminStore.updateAccessor({ ...curr, name: editState.name.trim(), email: editState.email.trim() });
-    setItems(AdminStore.listAccessors());
-    setEditOpen(false);
-  };
+
   const viewItem = (id: string) => {
-    const curr = items.find(x=>x.id===id); if(!curr) return;
-    setView({ open:true, title:'Accessor Details', body: (
-      <div className="text-sm text-gray-700 space-y-1">
-        <div>Name: {curr.name}</div>
-        <div>Email: {curr.email}</div>
-        <div>Status: {curr.active ? 'Active' : 'Disabled'}</div>
-        <div>Created: {new Date(curr.createdAt).toLocaleString()}</div>
-      </div>
-    )});
-  };
-  const disableItem = (id: string) => {
-    const curr = items.find(x=>x.id===id); if(!curr) return;
-    AdminStore.updateAccessor({ ...curr, active: !curr.active });
-    setItems(AdminStore.listAccessors());
-  };
-  const deleteItem = (id: string) => {
-    const curr = items.find(x=>x.id===id); if(!curr) return;
-    setModal({ open: true, title: 'Delete Accessor?', message: `This will permanently delete ${curr.name}.`, onConfirm: () => { AdminStore.deleteAccessor(id); setItems(AdminStore.listAccessors()); setModal({ open:false, title:'' }); } });
+    const curr = items.find((x) => String(x.id) === String(id));
+    if (!curr) return;
+    const m = curr.member || {};
+    setView({
+      open: true,
+      title: 'Accessor Details',
+      body: (
+        <div className="text-sm text-gray-700 space-y-1">
+          <div>Name: {`${m.title || ''} ${m.surname || ''} ${m.firstname || ''}`.trim() || '-'}</div>
+          <div>Email: {m.email || '-'}</div>
+          <div>Membership No.: {m.membership_no || '-'}</div>
+          <div>Status: {(curr.is_active ?? m.is_active) ? 'Active' : 'Disabled'}</div>
+          {curr.max_workload != null && <div>Max Workload: {curr.max_workload}</div>}
+        </div>
+      ),
+    });
   };
 
   return (
@@ -80,88 +125,201 @@ const AdminAccessors: React.FC = () => {
         <span aria-hidden>🧑‍⚖️</span>
         <span>Accessors</span>
       </div>
+
       <div className="flex items-center justify-between gap-3 flex-wrap">
         <div className="flex items-center gap-2">
-          <input value={q} onChange={e=>setQ(e.target.value)} placeholder="Search Accessors" className="px-3 py-2 border rounded-md text-sm w-72"/>
-          <select value={dietFilter} onChange={e=>setDietFilter(e.target.value)} className="px-3 py-2 border rounded-md text-sm">
-            <option value="all">All Diets</option>
-            {diets.map(d => (<option key={d.id} value={d.id}>{d.sessionName} - {d.diet}</option>))}
-          </select>
+          <input
+            value={q}
+            onChange={(e) => setQ(e.target.value)}
+            placeholder="Search Accessors"
+            className="px-3 py-2 border rounded-md text-sm w-72"
+          />
         </div>
-        <button onClick={openAdd} className="px-3 py-2 bg-indigo-600 text-white rounded-md text-sm">+ Add by Membership ID</button>
+        <button
+          onClick={openAdd}
+          className="px-3 py-2 bg-indigo-600 text-white rounded-md text-sm"
+        >
+          + Add by Membership ID
+        </button>
       </div>
+
+      {error && (
+        <div className="p-3 border rounded-md bg-red-50 text-red-700 border-red-200 text-sm">
+          {error}
+        </div>
+      )}
+      {success && (
+        <div className="p-3 border rounded-md bg-green-50 text-green-700 border-green-200 text-sm">
+          {success}
+        </div>
+      )}
+
       <div className="bg-white border rounded-xl">
-        <table className="w-full text-sm">
-          <thead>
-            <tr className="text-left">
-              <th className="p-3">Name</th>
-              <th className="p-3">Email</th>
-              <th className="p-3">Assigned</th>
-              <th className="p-3">Status</th>
-              <th className="p-3">Actions</th>
-            </tr>
-          </thead>
-          <tbody>
-            {filtered.map(a => (
-              <tr key={a.id} className="border-t">
-                <td className="p-3">{a.name}</td>
-                <td className="p-3">{a.email}</td>
-                <td className="p-3">{assignedCount(a.id)}</td>
-                <td className="p-3">
-                  <span className={`px-2 py-0.5 rounded text-xs ${a.active ? 'bg-green-100 text-green-700' : 'bg-gray-200 text-gray-600'}`}>{a.active ? 'Active' : 'Disabled'}</span>
-                </td>
-                <td className="p-3 space-x-2">
-                  <button onClick={()=>viewItem(a.id)} className="px-2 py-1 text-xs border rounded bg-blue-50 text-blue-700 border-blue-200 hover:bg-blue-100">👁️</button>
-                  <button onClick={()=>editItem(a.id)} className="px-2 py-1 text-xs border rounded bg-amber-50 text-amber-700 border-amber-200 hover:bg-amber-100">✏️</button>
-                  <button onClick={()=>disableItem(a.id)} className={`px-2 py-1 text-xs border rounded ${a.active ? 'bg-orange-50 text-orange-700 border-orange-200 hover:bg-orange-100' : 'bg-green-50 text-green-700 border-green-200 hover:bg-green-100'}`}>{a.active ? 'Disable' : 'Enable'}</button>
-                  <button onClick={()=>deleteItem(a.id)} className="px-2 py-1 text-xs border rounded bg-red-50 text-red-700 border-red-200 hover:bg-red-100">🗑️</button>
-                </td>
+        {loading ? (
+          <div className="p-4 text-sm text-gray-500">Loading accessors…</div>
+        ) : (
+          <table className="w-full text-sm">
+            <thead>
+              <tr className="text-left">
+                <th className="p-3">Membership No</th>
+                <th className="p-3">Name</th>
+                <th className="p-3">Email</th>
+                <th className="p-3">Status</th>
+                <th className="p-3">Actions</th>
               </tr>
-            ))}
-          </tbody>
-        </table>
+            </thead>
+            <tbody>
+              {filtered.map((a) => {
+                const m = a.member || {};
+                const name = `${m.title || ''} ${m.surname || ''} ${m.firstname || ''}`.trim() || '-';
+                const email = m.email || '-';
+                const active = (a.is_active ?? m.is_active) ? true : false;
+                return (
+                  <tr key={a.id} className="border-t">
+                    <td className="p-3">{m.membership_no || '-'}</td>
+                    <td className="p-3">{name}</td>
+                    <td className="p-3">{email}</td>
+                    <td className="p-3">
+                      <span
+                        className={`px-2 py-0.5 rounded text-xs ${
+                          active ? 'bg-green-100 text-green-700' : 'bg-gray-200 text-gray-600'
+                        }`}
+                      >
+                        {active ? 'Active' : 'Disabled'}
+                      </span>
+                    </td>
+                    <td className="p-3 space-x-2">
+                      <button
+                        onClick={() => viewItem(a.id)}
+                        className="px-2 py-1 text-xs border rounded bg-blue-50 text-blue-700 border-blue-200 hover:bg-blue-100"
+                      >
+                        👁️
+                      </button>
+                    </td>
+                  </tr>
+                );
+              })}
+              {filtered.length === 0 && !loading && (
+                <tr>
+                  <td className="p-3 text-xs text-gray-500" colSpan={5}>
+                    No accessors found.
+                  </td>
+                </tr>
+              )}
+            </tbody>
+          </table>
+        )}
       </div>
-      <Modal open={modal.open} title={modal.title} onClose={()=>setModal({open:false,title:''})} onConfirm={modal.onConfirm} confirmText="Delete">{modal.message}</Modal>
-      <Modal open={view.open} title={view.title} onClose={()=>setView({open:false,title:''})}>{view.body}</Modal>
-      <AddAccessorByMemberModal open={addOpen} lookup={lookup} setLookup={setLookup} onLookup={doLookup} onConfirm={confirmAddAccessor} onClose={()=>setAddOpen(false)} />
-      <Modal open={editOpen} title="Edit Accessor" onClose={()=>setEditOpen(false)} onConfirm={saveEdit} confirmText="Save">
-        <div className="space-y-3">
-          <div>
-            <div className="text-xs font-medium text-gray-700 mb-1">Full Name</div>
-            <input value={editState.name} onChange={e=>setEditState({ ...editState, name: e.target.value })} className="w-full px-3 py-2 border rounded-md text-sm" />
-          </div>
-          <div>
-            <div className="text-xs font-medium text-gray-700 mb-1">Email</div>
-            <input value={editState.email} onChange={e=>setEditState({ ...editState, email: e.target.value })} className="w-full px-3 py-2 border rounded-md text-sm" />
-          </div>
-        </div>
+
+      <Modal
+        open={view.open}
+        title={view.title}
+        onClose={() => setView({ open: false, title: '' })}
+      >
+        {view.body}
       </Modal>
+
+      <AddAccessorByMemberModal
+        open={addOpen}
+        lookup={lookup}
+        setLookup={setLookup}
+        onSearch={searchMembers}
+        onSelectMember={handleSelectMember}
+        onClose={() => setAddOpen(false)}
+        loading={lookupLoading}
+      />
     </div>
   );
 };
 
 export default AdminAccessors;
 
-const AddAccessorByMemberModal = ({ open, lookup, setLookup, onLookup, onConfirm, onClose }: { open: boolean; lookup: { id: string; result?: any; error?: string }; setLookup: (v:any)=>void; onLookup: ()=>void; onConfirm: ()=>void; onClose: ()=>void }) => {
+export type LookupState = { q: string; results: any[]; error?: string };
+
+const AddAccessorByMemberModal: React.FC<{
+  open: boolean;
+  lookup: LookupState;
+  setLookup: (v: LookupState) => void;
+  onSearch: (q: string) => void;
+  onSelectMember: (m: any) => void;
+  onClose: () => void;
+  loading?: boolean;
+}> = ({ open, lookup, setLookup, onSearch, onSelectMember, onClose, loading }) => {
   if (!open) return null;
+
   return (
-    <Modal open={true} title="Add Accessor by Membership ID" onClose={onClose} onConfirm={lookup.result ? onConfirm : undefined} confirmText="Add as Accessor">
+    <Modal
+      open={true}
+      title="Add Accessor by Membership ID"
+      onClose={onClose}
+      confirmText={undefined}
+      panelClassName="max-w-5xl w-[95vw]"
+      bodyClassName="!text-inherit"
+    >
       <div className="space-y-3">
         <div>
           <div className="text-xs font-medium text-gray-700 mb-1">Membership ID</div>
-          <div className="flex gap-2">
-            <input autoFocus value={lookup.id} onChange={e=>setLookup({ ...lookup, id: e.target.value })} placeholder="e.g. NIQS-2025-1234" className="w-full px-3 py-2 border rounded-md text-sm" />
-            <button onClick={onLookup} className="px-3 py-2 text-sm border rounded-md">Lookup</button>
-          </div>
-          {lookup.error && <div className="text-xs text-red-600 mt-1">{lookup.error}</div>}
+          <input
+            autoFocus
+            value={lookup.q}
+            onChange={(e) => {
+              const val = e.target.value;
+              setLookup({ ...lookup, q: val });
+              void onSearch(val);
+            }}
+            placeholder="e.g. M-2025-1234"
+            className="w-full px-3 py-2 border rounded-md text-sm"
+            disabled={loading}
+          />
+          {lookup.error && (
+            <div className="text-xs text-red-600 mt-1">{lookup.error}</div>
+          )}
         </div>
-        {lookup.result && (
-          <div className="border-t pt-3 text-sm text-gray-700 space-y-1">
-            <div><span className="text-gray-500">Name:</span> {lookup.result.name}</div>
-            <div><span className="text-gray-500">Email:</span> {lookup.result.email}</div>
-            {lookup.result.membershipNo && <div><span className="text-gray-500">Membership No.:</span> {lookup.result.membershipNo}</div>}
-          </div>
-        )}
+
+        <div className="border-t pt-3 text-sm text-gray-700">
+          {loading && (
+            <div className="text-xs text-gray-500 mb-2">Searching members…</div>
+          )}
+
+          {!loading && lookup.results.length === 0 && lookup.q.trim() && !lookup.error && (
+            <div className="text-xs text-gray-500">No members found.</div>
+          )}
+
+          {lookup.results.length > 0 && (
+            <div className="max-h-60 overflow-auto border rounded-md">
+              <table className="w-full text-sm">
+                <thead>
+                  <tr className="text-left">
+                    <th className="p-2">Membership No</th>
+                    <th className="p-2">Name</th>
+                    <th className="p-2">Email</th>
+                    <th className="p-2">Action</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {lookup.results.map((m: any) => (
+                    <tr key={m.id} className="border-t">
+                      <td className="p-2">{m.membership_no || m.membershipNo || '-'}</td>
+                      <td className="p-2">
+                        {`${m.title || ''} ${m.surname || ''} ${m.firstname || ''}`.trim() || m.name}
+                      </td>
+                      <td className="p-2">{m.email}</td>
+                      <td className="p-2">
+                        <button
+                          onClick={() => onSelectMember(m)}
+                          className="px-2 py-1 text-xs bg-indigo-600 text-white rounded disabled:opacity-60"
+                          disabled={loading}
+                        >
+                          Add as Accessor
+                        </button>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          )}
+        </div>
       </div>
     </Modal>
   );

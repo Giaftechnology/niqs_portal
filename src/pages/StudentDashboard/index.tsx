@@ -6,6 +6,7 @@ import Modal from '../../components/Modal';
 import WeekDropdown from '../../components/WeekDropdown';
 import { Day, DAYS, entriesKey, WEEKS, supervisionStatusKey, supervisorNameKey } from '../../utils/logbook';
 import { useLocalStorage } from '../../hooks/useLocalStorage';
+import { apiFetch } from '../../utils/api';
 
 type SupervisionStatus = 'none' | 'pending' | 'rejected' | 'approved';
 
@@ -27,6 +28,7 @@ const StudentDashboard: React.FC = () => {
   });
   const [totalEntries, setTotalEntries] = useState<number>(0);
   const [weeksCompleted, setWeeksCompleted] = useState<number>(0);
+  const [totalWeeks, setTotalWeeks] = useState<number>(52);
   const [modal, setModal] = useState<{ open: boolean; title: string; message?: string }>({ open: false, title: '' });
 
   // status persisted via useLocalStorage
@@ -39,7 +41,34 @@ const StudentDashboard: React.FC = () => {
     navigate('/app/supervisor-selection');
   };
 
-  const weeks = useMemo(() => WEEKS, []);
+  const weeks = useMemo(() => WEEKS.slice(0, totalWeeks), [totalWeeks]);
+
+  // Load logbook metadata from backend to know how many weeks exist
+  useEffect(() => {
+    const loadLogbookMeta = async () => {
+      try {
+        const res = await apiFetch<any>('/api/logbook/me');
+        const raw = Array.isArray(res)
+          ? res
+          : Array.isArray(res?.data)
+            ? res.data
+            : Array.isArray(res?.data?.data)
+              ? res.data.data
+              : [];
+        const obj = Array.isArray(raw) && raw.length ? raw[0] : null;
+        if (obj && typeof obj === 'object') {
+          const size = Number((obj as any).size || 0);
+          if (size > 0 && size <= 52) {
+            setTotalWeeks(size);
+          }
+        }
+      } catch {
+        // ignore, fall back to default 52 weeks
+      }
+    };
+
+    void loadLogbookMeta();
+  }, []);
 
   useEffect(() => {
     // load existing entries for selected week
@@ -58,7 +87,7 @@ const StudentDashboard: React.FC = () => {
     // update counters
     let entries = 0;
     let completed = 0;
-    for (let w = 1; w <= 52; w++) {
+    for (let w = 1; w <= totalWeeks; w++) {
       const r = user ? localStorage.getItem(entriesKey(user.email, w)) : null;
       if (r) {
         try {
@@ -71,7 +100,7 @@ const StudentDashboard: React.FC = () => {
     }
     setTotalEntries(entries);
     setWeeksCompleted(completed);
-  }, [selectedWeek, status, user]);
+  }, [selectedWeek, status, user, totalWeeks]);
 
   const handleSaveDay = (day: Day) => {
     if (!user) return;
@@ -86,6 +115,19 @@ const StudentDashboard: React.FC = () => {
     if (idx >= 0) items[idx] = entry; else items.push(entry);
     localStorage.setItem(k, JSON.stringify(items));
     setModal({ open: true, title: 'Entry Saved', message: `${day} saved for Week ${selectedWeek}. Submitted for supervisor approval.` });
+  };
+
+  // determine which weeks have at least one entry stored
+  const weekHasEntries = (week: number): boolean => {
+    if (!user) return false;
+    const raw = localStorage.getItem(entriesKey(user.email, week));
+    if (!raw) return false;
+    try {
+      const parsed = JSON.parse(raw) as Array<{ day: Day; text: string; status: string }>;
+      return parsed.length > 0;
+    } catch {
+      return false;
+    }
   };
 
   return (
@@ -154,6 +196,36 @@ const StudentDashboard: React.FC = () => {
               {status === 'approved' && (
                 <span className="inline-flex items-center px-3 py-1 text-xs rounded-md bg-emerald-50 text-emerald-700 border border-emerald-200">Approved by {supervisorName || 'Supervisor'}</span>
               )}
+            </div>
+          )}
+
+          {status === 'approved' && (
+            <div className="bg-white border border-gray-200 rounded-xl p-4">
+              <h3 className="text-xs font-semibold text-gray-800 mb-3">Weeks</h3>
+              <div className="flex flex-wrap gap-2">
+                {weeks.map((w) => {
+                  const filled = weekHasEntries(w);
+                  const isSelected = selectedWeek === w;
+                  return (
+                    <button
+                      key={w}
+                      type="button"
+                      onClick={() => setSelectedWeek(w)}
+                      className={`px-2.5 py-1 text-xs rounded-md border transition-colors ${
+                        filled
+                          ? isSelected
+                            ? 'bg-indigo-600 text-white border-indigo-600'
+                            : 'bg-indigo-50 text-indigo-700 border-indigo-200'
+                          : isSelected
+                            ? 'bg-gray-200 text-gray-800 border-gray-300'
+                            : 'bg-white text-gray-600 border-gray-200'
+                      }`}
+                    >
+                      W{w}
+                    </button>
+                  );
+                })}
+              </div>
             </div>
           )}
         </div>

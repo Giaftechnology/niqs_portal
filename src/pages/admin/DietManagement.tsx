@@ -249,7 +249,17 @@ const AdminDietManagement: React.FC = () => {
         </div>
       </Modal>
       {/* details now shown on dedicated page */}
-      <AssignAccessorModal open={assign.open} dietId={assign.dietId} onClose={()=>{ setAssign({open:false}); setAssignQ(''); }} q={assignQ} setQ={setAssignQ} onAssigned={()=>{ fetchList(); setDetails(d=>({ ...d })); }} />
+      <AssignAccessorModal
+        open={assign.open}
+        dietId={assign.dietId}
+        onClose={()=>{ setAssign({open:false}); setAssignQ(''); }}
+        q={assignQ}
+        setQ={setAssignQ}
+        onAssigned={(msg)=>{
+          fetchList();
+          setSuccessMsg(msg || 'Accessor assignment updated.');
+        }}
+      />
       <AssignSupervisorModal open={supPick.open} studentEmail={supPick.studentEmail} q={supQ} setQ={setSupQ} onClose={()=>{ setSupPick({open:false}); setSupQ(''); }} />
     </div>
   );
@@ -339,38 +349,103 @@ const Stat = ({ title, value }: { title: string; value: number }) => (
   </div>
 );
 
-const AssignAccessorModal = ({ open, dietId, q, setQ, onClose, onAssigned }: { open: boolean; dietId?: string; q: string; setQ: (v:string)=>void; onClose: ()=>void; onAssigned: ()=>void }) => {
+const AssignAccessorModal = ({ open, dietId, q, setQ, onClose, onAssigned }: { open: boolean; dietId?: string; q: string; setQ: (v:string)=>void; onClose: ()=>void; onAssigned: (msg?: string)=>void }) => {
+  const [loading, setLoading] = useState(false);
+  const [list, setList] = useState<any[]>([]);
+  const [error, setError] = useState<string | null>(null);
+  const [assigningId, setAssigningId] = useState<string | null>(null);
+
+  useEffect(() => {
+    const load = async () => {
+      if (!open || !dietId) return;
+      setLoading(true); setError(null);
+      try {
+        const res = await apiFetch<any>('/api/assessors');
+        const arr = Array.isArray(res?.data) ? res.data : Array.isArray(res) ? res : [];
+        setList(arr);
+      } catch (e: any) {
+        setError(e?.message || 'Failed to load assessors');
+      } finally {
+        setLoading(false);
+      }
+    };
+    void load();
+  }, [open, dietId]);
+
   if (!open || !dietId) return null;
-  const diet = AdminStore.listDiets().find(d=>d.id===dietId);
-  const accessors = AdminStore.listAccessors();
-  const filtered = accessors.filter(a => `${a.name} ${a.email}`.toLowerCase().includes(q.toLowerCase()));
-  const assign = (aid: string) => { AdminStore.assignAccessorToDiet(dietId, aid); onAssigned(); };
+
+  const filtered = list.filter((a) => {
+    const name = `${a.member?.surname || ''} ${a.member?.firstname || ''}`;
+    const email = a.member?.email || '';
+    const membership = a.member?.membership_no || '';
+    return `${name} ${email} ${membership}`.toLowerCase().includes(q.toLowerCase());
+  });
+
+  const assign = async (assessorId: string) => {
+    if (!dietId) return;
+    setAssigningId(assessorId);
+    try {
+      const res = await apiFetch<any>('/api/assessors/assign-to-diet', {
+        method: 'POST',
+        body: { assessor_id: assessorId, diet_id: dietId },
+      });
+      const msg =
+        (typeof res?.message === 'string' && res.message) ||
+        (typeof res?.data?.message === 'string' && res.data.message) ||
+        'Accessor assignment updated.';
+      setError(null);
+      onAssigned(msg);
+      onClose();
+    } catch (e: any) {
+      setError(e?.message || 'Failed to assign assessor');
+    } finally {
+      setAssigningId(null);
+    }
+  };
+
   return (
     <Modal open={true} title="Assign Accessor" onClose={onClose} panelClassName="max-w-2xl w-[90vw] max-h-[80vh]" bodyClassName="overflow-y-auto max-h-[60vh] pr-1">
       <div className="space-y-3">
-        <input value={q} onChange={e=>setQ(e.target.value)} placeholder="Search accessors" className="w-full px-3 py-2 border rounded-md text-sm" />
+        <input value={q} onChange={e=>setQ(e.target.value)} placeholder="Search assessors" className="w-full px-3 py-2 border rounded-md text-sm" />
+        {error && <div className="text-xs text-red-600">{error}</div>}
         <div className="max-h-60 overflow-auto border rounded-md">
-          <table className="w-full text-sm">
-            <thead>
-              <tr className="text-left">
-                <th className="p-2">Name</th>
-                <th className="p-2">Email</th>
-                <th className="p-2">Action</th>
-              </tr>
-            </thead>
-            <tbody>
-              {filtered.map(a => (
-                <tr key={a.id} className="border-t">
-                  <td className="p-2">{a.name}</td>
-                  <td className="p-2">{a.email}</td>
-                  <td className="p-2"><button onClick={()=>assign(a.id)} className="px-2 py-1 text-xs bg-indigo-600 text-white rounded">Assign</button></td>
+          {loading ? (
+            <div className="p-3 text-xs text-gray-500">Loading assessors…</div>
+          ) : (
+            <table className="w-full text-sm">
+              <thead>
+                <tr className="text-left">
+                  <th className="p-2">Membership No</th>
+                  <th className="p-2">Name</th>
+                  <th className="p-2">Email</th>
+                  <th className="p-2">Action</th>
                 </tr>
-              ))}
-              {filtered.length===0 && (
-                <tr><td className="p-2 text-xs text-gray-500" colSpan={3}>No accessors match your search.</td></tr>
-              )}
-            </tbody>
-          </table>
+              </thead>
+              <tbody>
+                {filtered.map((a) => {
+                  const accessorId = a.assessor_id || a.id;
+                  return (
+                  <tr key={accessorId} className="border-t">
+                    <td className="p-2">{a.member?.membership_no || '-'}</td>
+                    <td className="p-2">{`${a.member?.title || ''} ${a.member?.surname || ''} ${a.member?.firstname || ''}`.trim() || '-'}</td>
+                    <td className="p-2">{a.member?.email || '-'}</td>
+                    <td className="p-2">
+                      <button
+                        onClick={()=>void assign(accessorId)}
+                        className="px-2 py-1 text-xs bg-indigo-600 text-white rounded disabled:opacity-60"
+                        disabled={Boolean(assigningId)}
+                      >
+                        {assigningId === accessorId ? 'Assigning…' : 'Assign'}
+                      </button>
+                    </td>
+                  </tr>
+                );})}
+                {filtered.length === 0 && !loading && (
+                  <tr><td className="p-2 text-xs text-gray-500" colSpan={4}>No assessors match your search.</td></tr>
+                )}
+              </tbody>
+            </table>
+          )}
         </div>
       </div>
     </Modal>
