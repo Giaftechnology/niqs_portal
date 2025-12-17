@@ -54,7 +54,15 @@ const AdminLogbooks: React.FC = () => {
   }, []);
 
   return (
-    <div className="space-y-4">
+    <div className="relative space-y-4">
+      {loading && (
+        <div className="fixed inset-0 z-40 flex items-center justify-center bg-white/70">
+          <div className="flex flex-col items-center gap-2 text-sm text-gray-700">
+            <span className="inline-block w-6 h-6 border-4 border-indigo-500 border-t-transparent rounded-full animate-spin" />
+            <span>Loading logbooks…</span>
+          </div>
+        </div>
+      )}
       <div className="flex items-center justify-between">
         <div className="text-lg font-semibold">Logbooks</div>
         <input placeholder="Search" value={q} onChange={e=>setQ(e.target.value)} className="px-3 py-2 border rounded-md text-sm w-64" />

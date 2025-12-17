@@ -16,7 +16,7 @@ const Modal: React.FC<ModalProps> = ({ open, title, children, onClose, onConfirm
   if (!open) return null;
   const panelClasses = panelClassName && panelClassName.trim().length > 0
     ? panelClassName
-    : 'w-full max-w-sm';
+    : 'w-full max-w-lg sm:max-w-xl';
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center">
       <div className="absolute inset-0 bg-black/40" onClick={onClose} />

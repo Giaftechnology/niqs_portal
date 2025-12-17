@@ -36,6 +36,7 @@ const NUMBER_TO_DAY: Record<number, Day> = {
 
 const MyLogbook: React.FC = () => {
   const { user } = useAuth();
+  const [logbooks, setLogbooks] = useState<LogbookMe[]>([]);
   const [logbook, setLogbook] = useState<LogbookMe | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -118,44 +119,24 @@ const MyLogbook: React.FC = () => {
             : Array.isArray(res?.data?.data)
               ? res.data.data
               : [];
-        const obj = Array.isArray(raw) && raw.length ? raw[0] : null;
-        if (obj && typeof obj === 'object') {
-          const lb: LogbookMe = {
-            id: String(obj.id),
-            stage: obj.stage,
-            status: obj.status,
-            supervisor: obj.supervisor || null,
-            created_at: obj.created_at,
-            updated_at: obj.updated_at,
-          };
-          setLogbook(lb);
 
-          // Derive supervision status from backend data
-          let nextStatus: SupervisionStatus = 'none';
-          const rawStatus = String(lb.status || '').toLowerCase();
+        const list: LogbookMe[] = Array.isArray(raw)
+          ? raw
+              .filter((obj: any) => obj && typeof obj === 'object')
+              .map((obj: any) => ({
+                id: String(obj.id),
+                stage: obj.stage,
+                status: obj.status,
+                supervisor: obj.supervisor || null,
+                created_at: obj.created_at,
+                updated_at: obj.updated_at,
+              }))
+          : [];
 
-          if (lb.supervisor) {
-            // If a supervisor is attached, treat as approved
-            setSupervisorName((prev) => prev || lb.supervisor?.name || lb.supervisor?.email || '');
-            nextStatus = 'approved';
-          } else if (rawStatus === 'pending') {
-            nextStatus = 'pending';
-          } else if (rawStatus === 'rejected') {
-            nextStatus = 'rejected';
-          } else if (rawStatus === 'accepted' || rawStatus === 'approved') {
-            nextStatus = 'approved';
-          }
+        setLogbooks(list);
 
-          setStatus(nextStatus);
-
-          // If backend includes size, use it to constrain weeks (1..size)
-          const size = Number((obj as any).size || 0);
-          if (size > 0 && size <= 52) {
-            setTotalWeeks(size);
-          }
-        } else {
-          setLogbook(null);
-        }
+        // Start with no active logbook; user must click View to open details
+        setLogbook(null);
       } catch (e: any) {
         setError(e?.message || 'Failed to load logbook');
       } finally {
@@ -419,289 +400,398 @@ const MyLogbook: React.FC = () => {
     }
   };
 
+  const [hasSelectedLogbook, setHasSelectedLogbook] = useState(false);
+
+  const handleSelectLogbook = (lb: LogbookMe) => {
+    setLogbook(lb);
+
+    let nextStatus: SupervisionStatus = 'none';
+    const rawStatus = String(lb.status || '').toLowerCase();
+
+    if (lb.supervisor) {
+      setSupervisorName((prev) => prev || lb.supervisor?.name || lb.supervisor?.email || '');
+      nextStatus = 'approved';
+    } else if (rawStatus === 'pending') {
+      nextStatus = 'pending';
+    } else if (rawStatus === 'rejected') {
+      nextStatus = 'rejected';
+    } else if (rawStatus === 'accepted' || rawStatus === 'approved') {
+      nextStatus = 'approved';
+    }
+
+    setStatus(nextStatus);
+    setHasSelectedLogbook(true);
+  };
+
   return (
     <div className="min-h-[calc(100vh-4rem)] bg-gray-100 p-4 sm:p-6">
-      <div className="flex gap-6">
-        {/* Left sidebar */}
-        <div className="w-80 flex flex-col gap-4">
-          <div className="bg-gradient-to-br from-indigo-50 to-purple-50 border border-purple-200 rounded-xl p-6">
-            <div className="flex items-center gap-2 mb-4">
-              <BookOpen size={20} color="#6366f1" />
-              <h3 className="text-sm font-semibold text-gray-800">Current Level</h3>
-            </div>
-            <h2 className="text-4xl font-bold text-indigo-500 mt-2">{levelLabel}</h2>
-          </div>
-
+      <div className="space-y-6">
+        {/* Show the logbook list only when no logbook is selected */}
+        {logbooks.length > 0 && !hasSelectedLogbook && (
           <div className="bg-white border border-gray-200 rounded-xl p-6">
-            <div className="flex items-center gap-2 mb-4">
-              <TrendingUp size={20} color="#1f2937" />
-              <h3 className="text-sm font-semibold text-gray-800">Progress</h3>
-            </div>
-            <div className="flex justify-between items-center pb-4 mb-4 border-b border-gray-200">
-              <span className="text-sm text-gray-500">Weeks Completed</span>
-              <span className="text-sm font-semibold text-gray-800">{weeksCompleted} / 52</span>
-            </div>
-            <div className="bg-gray-50 p-4 rounded-lg flex flex-col gap-1">
-              <span className="text-xs text-gray-500">Total Entries</span>
-              <span className="text-2xl font-bold text-gray-800">{totalEntries}</span>
+            <h2 className="text-sm font-semibold text-gray-800 mb-4">My Logbooks</h2>
+            <div className="overflow-x-auto">
+              <table className="min-w-full text-sm">
+                <thead className="bg-gray-50">
+                  <tr>
+                    <th className="text-left px-3 py-2">Level</th>
+                    <th className="text-left px-3 py-2">Status</th>
+                    <th className="text-left px-3 py-2">Supervisor</th>
+                    <th className="text-left px-3 py-2">Created</th>
+                    <th className="text-right px-3 py-2">Action</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {logbooks.map((lb) => {
+                    const isActive = logbook && lb.id === logbook.id;
+                    const rawStatus = String(lb.status || '').toLowerCase();
+                    let statusLabel = 'None';
+                    if (rawStatus) statusLabel = rawStatus.charAt(0).toUpperCase() + rawStatus.slice(1);
+                    return (
+                      <tr key={lb.id} className="border-t">
+                        <td className="px-3 py-2">{lb.stage ? `Level ${lb.stage}` : '-'}</td>
+                        <td className="px-3 py-2 text-xs">
+                          <span className="inline-flex items-center px-2 py-0.5 rounded-full bg-gray-100 text-gray-700 border border-gray-200">
+                            {statusLabel}
+                          </span>
+                        </td>
+                        <td className="px-3 py-2 text-xs text-gray-700">
+                          {lb.supervisor?.name || lb.supervisor?.email || '—'}
+                        </td>
+                        <td className="px-3 py-2 text-xs text-gray-500">
+                          {lb.created_at ? String(lb.created_at).slice(0, 10) : '—'}
+                        </td>
+                        <td className="px-3 py-2 text-right">
+                          <button
+                            type="button"
+                            onClick={() => handleSelectLogbook(lb)}
+                            disabled={!!isActive}
+                            className="px-3 py-1.5 rounded-md text-xs border border-indigo-500 text-indigo-600 hover:bg-indigo-50 disabled:opacity-60"
+                          >
+                            {isActive ? 'Viewing' : 'View'}
+                          </button>
+                        </td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
             </div>
           </div>
+        )}
 
-          {status !== 'none' && (
-            <div className="bg-white border border-gray-200 rounded-xl p-6">
-              <h3 className="text-base font-semibold text-gray-800 mb-3">Supervision Status</h3>
-              {status === 'pending' && (
-                <p className="text-sm text-gray-600">Waiting for {supervisorName || 'your supervisor'} to approve.</p>
-              )}
-              {status === 'rejected' && (
-                <p className="text-sm text-red-600">Your supervision request was rejected. Request another supervisor.</p>
-              )}
-              {status === 'approved' && (
-                <span className="inline-flex items-center px-3 py-1 text-xs rounded-md bg-emerald-50 text-emerald-700 border border-emerald-200">
-                  Approved by {supervisorName || 'Supervisor'}
-                </span>
-              )}
-            </div>
-          )}
+        {loading && (
+          <div className="bg-white border border-gray-200 rounded-xl p-6 text-sm text-gray-600">Loading logbook…</div>
+        )}
+        {error && !loading && (
+          <div className="bg-white border border-red-200 rounded-xl p-6 text-sm text-red-700">{error}</div>
+        )}
+        {!loading && !error && logbooks.length === 0 && (
+          <div className="bg-white border border-gray-200 rounded-xl p-8">
+            <h2 className="text-2xl font-semibold text-gray-800 mb-2">My Logbook</h2>
+            <p className="text-sm text-gray-500">You do not currently have any logbooks.</p>
+          </div>
+        )}
 
-          {logbook && status === 'approved' && (
-            <div className="bg-white border border-gray-200 rounded-xl p-4">
-              <h3 className="text-xs font-semibold text-gray-800 mb-3">Weeks</h3>
-              <div className="flex flex-wrap gap-2">
-                {weeks.map((w) => {
-                  const filled = weekHasEntries(w);
-                  const isSelected = selectedWeek === w;
-                  return (
-                    <button
-                      key={w}
-                      type="button"
-                      onClick={() => setSelectedWeek(w)}
-                      className={`px-2.5 py-1 text-xs rounded-md border transition-colors ${
-                        filled
-                          ? isSelected
-                            ? 'bg-indigo-600 text-white border-indigo-600'
-                            : 'bg-indigo-50 text-indigo-700 border-indigo-200'
-                          : isSelected
-                            ? 'bg-gray-200 text-gray-800 border-gray-300'
-                            : 'bg-white text-gray-600 border-gray-200'
-                      }`}
-                    >
-                      W{w}
-                    </button>
-                  );
-                })}
-              </div>
-            </div>
-          )}
-        </div>
-
-        {/* Right content */}
-        <div className="flex-1 space-y-6">
-          {loading && (
-            <div className="bg-white border border-gray-200 rounded-xl p-6 text-sm text-gray-600">Loading logbook…</div>
-          )}
-          {error && !loading && (
-            <div className="bg-white border border-red-200 rounded-xl p-6 text-sm text-red-700">{error}</div>
-          )}
-          {!loading && !logbook && !error && (
-            <div className="bg-white border border-gray-200 rounded-xl p-8">
-              <h2 className="text-2xl font-semibold text-gray-800 mb-2">My Logbook</h2>
-              <p className="text-sm text-gray-500">You do not currently have an active logbook.</p>
-            </div>
-          )}
-
-          {logbook && status === 'none' && (
-            <div className="bg-white border border-gray-200 rounded-xl p-8 space-y-6">
-              <div>
-                <h2 className="text-2xl font-semibold text-gray-800 mb-2">Logbook Access</h2>
-                <p className="text-sm text-gray-500 mb-4">You need an approved supervisor before you can start filling your logbook.</p>
-              </div>
-
-              <div className="space-y-3">
-                <div className="text-xs text-gray-600">Search Supervisor (membership ID or name)</div>
-                <input
-                  type="text"
-                  value={supQuery}
-                  onChange={handleSupQueryChange}
-                  className="w-full px-3 py-2 border-2 border-indigo-500 rounded-lg text-sm bg-white focus:outline-none focus:border-indigo-600"
-                  placeholder="Search by membership ID or name..."
-                />
-                <div className="text-xs text-gray-600 mt-2">Message to Supervisor</div>
-                <textarea
-                  value={supMessage}
-                  onChange={(e) => setSupMessage(e.target.value)}
-                  className="w-full px-3 py-2 border border-gray-200 rounded-md text-sm bg-white"
-                  rows={3}
-                  placeholder="Briefly explain why you need supervision..."
-                />
-                {supError && <div className="text-xs text-red-600">{supError}</div>}
-                {supLoading && <div className="text-xs text-gray-500">Searching…</div>}
-                {!!supResults.length && (
-                  <div className="bg-white rounded-xl border border-gray-200 overflow-hidden">
-                    <div className="max-h-64 overflow-y-auto divide-y">
-                      {supResults.map((m) => (
-                        <div key={m.id} className="flex items-center justify-between gap-3 px-4 py-3 text-sm">
-                          <div>
-                            <div className="font-medium">
-                              {m.name || `${m.title || ''} ${m.surname || ''} ${m.firstname || ''}`.trim()}
-                            </div>
-                            <div className="text-xs text-gray-500">
-                              {(m.membership_no || m.membership_id || m.member_id) && (
-                                <span className="mr-1">{m.membership_no || m.membership_id || m.member_id}</span>
-                              )}
-                              {m.email}
-                            </div>
-                          </div>
-                          <button
-                            type="button"
-                            onClick={() => requestSupervisor(m)}
-                            disabled={requestingId === String(m.id)}
-                            className="px-3 py-1.5 bg-indigo-500 text-white rounded-md text-xs hover:bg-indigo-600 disabled:opacity-60"
-                          >
-                            {requestingId === String(m.id) ? 'Requesting…' : 'Request'}
-                          </button>
-                        </div>
-                      ))}
-                    </div>
-                  </div>
-                )}
-              </div>
-            </div>
-          )}
-
-          {logbook && status === 'pending' && (
-            <div className="bg-white border border-gray-200 rounded-xl p-12 text-center">
-              <h2 className="text-2xl font-semibold text-gray-800 mb-2">Logbook Access</h2>
-              <p className="text-sm text-gray-500">Waiting for {supervisorName || 'your supervisor'} to accept your request.</p>
-            </div>
-          )}
-
-          {logbook && status === 'rejected' && (
-            <div className="bg-white border border-gray-200 rounded-xl p-8 space-y-4">
-              <h2 className="text-2xl font-semibold text-gray-800 mb-2">Logbook Access</h2>
-              <p className="text-sm text-red-600">Your supervision request was rejected.</p>
-              <p className="text-sm text-gray-500">Search and request a different supervisor below.</p>
-              <div className="space-y-3">
-                <div className="text-xs text-gray-600">Search Supervisor</div>
-                <input
-                  type="text"
-                  value={supQuery}
-                  onChange={handleSupQueryChange}
-                  className="w-full px-3 py-2 border-2 border-indigo-500 rounded-lg text-sm bg-white focus:outline-none focus:border-indigo-600"
-                  placeholder="Search by membership ID or name..."
-                />
-                <div className="text-xs text-gray-600 mt-2">Message to Supervisor</div>
-                <textarea
-                  value={supMessage}
-                  onChange={(e) => setSupMessage(e.target.value)}
-                  className="w-full px-3 py-2 border border-gray-200 rounded-md text-sm bg-white"
-                  rows={3}
-                  placeholder="Briefly explain why you need supervision..."
-                />
-                {supError && <div className="text-xs text-red-600">{supError}</div>}
-                {supLoading && <div className="text-xs text-gray-500">Searching…</div>}
-                {!!supResults.length && (
-                  <div className="bg-white rounded-xl border border-gray-200 overflow-hidden">
-                    <div className="max-h-64 overflow-y-auto divide-y">
-                      {supResults.map((m) => (
-                        <div key={m.id} className="flex items-center justify-between gap-3 px-4 py-3 text-sm">
-                          <div>
-                            <div className="font-medium">
-                              {m.name || `${m.title || ''} ${m.surname || ''} ${m.firstname || ''}`.trim()}
-                            </div>
-                            <div className="text-xs text-gray-500">
-                              {(m.membership_no || m.membership_id || m.member_id) && (
-                                <span className="mr-1">{m.membership_no || m.membership_id || m.member_id}</span>
-                              )}
-                              {m.email}
-                            </div>
-                          </div>
-                          <button
-                            type="button"
-                            onClick={() => requestSupervisor(m)}
-                            disabled={requestingId === String(m.id)}
-                            className="px-3 py-1.5 bg-indigo-500 text-white rounded-md text-xs hover:bg-indigo-600 disabled:opacity-60"
-                          >
-                            {requestingId === String(m.id) ? 'Requesting…' : 'Request'}
-                          </button>
-                        </div>
-                      ))}
-                    </div>
-                  </div>
-                )}
-              </div>
-            </div>
-          )}
-
-          {logbook && status === 'approved' && (
-            <div className="space-y-6">
-              <div className="bg-white border border-gray-200 rounded-xl p-6">
-                <h2 className="text-sm font-semibold text-gray-800 mb-3">Select Week</h2>
-                <WeekDropdown value={selectedWeek} onChange={setSelectedWeek} weeks={weeks} size="md" />
+        {/* Detailed view only after a logbook has been selected */}
+        {hasSelectedLogbook && logbook && (
+          <div className="flex gap-6">
+            {/* Left sidebar */}
+            <div className="w-80 flex flex-col gap-4">
+              <div className="bg-gradient-to-br from-indigo-50 to-purple-50 border border-purple-200 rounded-xl p-6">
+                <div className="flex items-center gap-2 mb-4">
+                  <BookOpen size={20} color="#6366f1" />
+                  <h3 className="text-sm font-semibold text-gray-800">Current Level</h3>
+                </div>
+                <h2 className="text-4xl font-bold text-indigo-500 mt-2">{levelLabel}</h2>
               </div>
 
               <div className="bg-white border border-gray-200 rounded-xl p-6">
-                <h2 className="text-sm font-semibold text-gray-800 mb-4">Week {selectedWeek} - Daily Entries</h2>
-                <div className="space-y-4">
-                  {DAYS.map((day) => (
-                    <div key={day} className="p-3 rounded-lg bg-gray-50 space-y-2">
-                      <label className="block text-xs font-medium text-gray-600">{day}</label>
-                      <textarea
-                        className="w-full px-3 py-2 text-sm border border-gray-200 rounded-md bg-white"
-                        rows={3}
-                        placeholder={`Type your ${day} log...`}
-                        value={dailyText[day]}
-                        onChange={(e) => setDailyText((prev) => ({ ...prev, [day]: e.target.value }))}
-                      />
-                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
-                        <div>
-                          <label className="block text-[11px] text-gray-600 mb-1">Entry date</label>
-                          <input
-                            type="date"
-                            className="w-full px-3 py-1.5 text-xs border border-gray-200 rounded-md bg-white"
-                            value={dailyDate[day]}
-                            onChange={(e) => setDailyDate((prev) => ({ ...prev, [day]: e.target.value }))}
-                          />
-                        </div>
-                        <div>
-                          <label className="block text-[11px] text-gray-600 mb-1">Hours</label>
-                          <input
-                            type="number"
-                            min={0}
-                            step={0.5}
-                            className="w-full px-3 py-1.5 text-xs border border-gray-200 rounded-md bg-white"
-                            value={dailyHours[day]}
-                            onChange={(e) => setDailyHours((prev) => ({ ...prev, [day]: e.target.value }))}
-                          />
-                        </div>
-                      </div>
-                      <div className="mt-2 flex justify-end">
-                        <button
-                          onClick={() => { setSavingDay(day); void handleSaveDay(day).finally(() => setSavingDay(null)); }}
-                          disabled={savingDay === day || (entryMeta[day]?.status || '').toLowerCase() === 'approved'}
-                          className="px-3 py-1.5 bg-indigo-500 text-white rounded-md text-xs hover:bg-indigo-600 disabled:opacity-60 flex items-center gap-2"
-                        >
-                          {savingDay === day && (
-                            <span className="inline-block w-3 h-3 border-2 border-white border-t-transparent rounded-full animate-spin" />
-                          )}
-                          <span>{(entryMeta[day]?.status || '').toLowerCase() === 'approved' ? 'Approved' : 'Save'}</span>
-                        </button>
-                      </div>
-                    </div>
-                  ))}
+                <div className="flex items-center gap-2 mb-4">
+                  <TrendingUp size={20} color="#1f2937" />
+                  <h3 className="text-sm font-semibold text-gray-800">Progress</h3>
+                </div>
+                <div className="flex justify-between items-center pb-4 mb-4 border-b border-gray-200">
+                  <span className="text-sm text-gray-500">Weeks Completed</span>
+                  <span className="text-sm font-semibold text-gray-800">{weeksCompleted} / 52</span>
+                </div>
+                <div className="bg-gray-50 p-4 rounded-lg flex flex-col gap-1">
+                  <span className="text-xs text-gray-500">Total Entries</span>
+                  <span className="text-2xl font-bold text-gray-800">{totalEntries}</span>
                 </div>
               </div>
-            </div>
-          )}
 
-          <Modal
-            open={modal.open}
-            title={modal.title}
-            onClose={() => setModal({ open: false, title: '' })}
-          >
-            {modal.message}
-          </Modal>
-        </div>
+              {status !== 'none' && (
+                <div className="bg-white border border-gray-200 rounded-xl p-6">
+                  <h3 className="text-base font-semibold text-gray-800 mb-3">Supervisor Details</h3>
+                  <div className="space-y-2 text-sm text-gray-700">
+                    <div className="font-medium">
+                      {logbook?.supervisor?.name || supervisorName || 'Supervisor not assigned'}
+                    </div>
+                    {(logbook?.supervisor?.email || logbook?.supervisor?.membership_no) && (
+                      <div className="text-xs text-gray-500">
+                        {logbook?.supervisor?.membership_no && (
+                          <span className="mr-2">{logbook.supervisor.membership_no}</span>
+                        )}
+                        {logbook?.supervisor?.email}
+                      </div>
+                    )}
+                    <div className="mt-2">
+                      {status === 'pending' && (
+                        <span className="inline-flex items-center px-3 py-1 text-xs rounded-md bg-amber-50 text-amber-700 border border-amber-200">
+                          Supervision request pending
+                        </span>
+                      )}
+                      {status === 'rejected' && (
+                        <span className="inline-flex items-center px-3 py-1 text-xs rounded-md bg-red-50 text-red-700 border border-red-200">
+                          Supervision request rejected
+                        </span>
+                      )}
+                      {status === 'approved' && (
+                        <span className="inline-flex items-center px-3 py-1 text-xs rounded-md bg-emerald-50 text-emerald-700 border border-emerald-200">
+                          Supervision approved
+                        </span>
+                      )}
+                    </div>
+                  </div>
+                </div>
+              )}
+
+              {status === 'approved' && (
+                <div className="bg-white border border-gray-200 rounded-xl p-4">
+                  <h3 className="text-xs font-semibold text-gray-800 mb-3">Weeks</h3>
+                  <div className="grid grid-cols-6 gap-2">
+                    {weeks.map((w) => {
+                      const filled = weekHasEntries(w);
+                      const isSelected = selectedWeek === w;
+                      return (
+                        <button
+                          key={w}
+                          type="button"
+                          onClick={() => setSelectedWeek(w)}
+                          className={`w-full py-1 text-xs rounded-md border transition-colors ${
+                            isSelected
+                              ? 'bg-purple-800 text-white border-purple-800'
+                              : filled
+                                ? 'bg-purple-50 text-purple-700 border-purple-200'
+                                : 'bg-white text-gray-600 border-gray-200'
+                          }`}
+                        >
+                          {w}
+                        </button>
+                      );
+                    })}
+                  </div>
+                </div>
+              )}
+            </div>
+
+            {/* Right content */}
+            <div className="flex-1 space-y-6">
+              <div className="flex items-center justify-between">
+                <button
+                  type="button"
+                  onClick={() => { setHasSelectedLogbook(false); setLogbook(null); }}
+                  className="px-3 py-1.5 border rounded-md text-xs"
+                >
+                  ← Back to My Logbooks
+                </button>
+              </div>
+
+              {logbook && status === 'none' && (
+                <div className="bg-white border border-gray-200 rounded-xl p-8 space-y-6">
+                  <div>
+                    <h2 className="text-2xl font-semibold text-gray-800 mb-2">Logbook Access</h2>
+                    <p className="text-sm text-gray-500 mb-4">You need an approved supervisor before you can start filling your logbook.</p>
+                  </div>
+
+                  <div className="space-y-3">
+                    <div className="text-xs text-gray-600">Search Supervisor (membership ID or name)</div>
+                    <input
+                      type="text"
+                      value={supQuery}
+                      onChange={handleSupQueryChange}
+                      className="w-full px-3 py-2 border-2 border-indigo-500 rounded-lg text-sm bg-white focus:outline-none focus:border-indigo-600"
+                      placeholder="Search by membership ID or name..."
+                    />
+                    <div className="text-xs text-gray-600 mt-2">Message to Supervisor</div>
+                    <textarea
+                      value={supMessage}
+                      onChange={(e) => setSupMessage(e.target.value)}
+                      className="w-full px-3 py-2 border border-gray-200 rounded-md text-sm bg-white"
+                      rows={3}
+                      placeholder="Briefly explain why you need supervision..."
+                    />
+                    {supError && <div className="text-xs text-red-600">{supError}</div>}
+                    {supLoading && <div className="text-xs text-gray-500">Searching…</div>}
+                    {!!supResults.length && (
+                      <div className="bg-white rounded-xl border border-gray-200 overflow-hidden">
+                        <div className="max-h-64 overflow-y-auto divide-y">
+                          {supResults.map((m) => (
+                            <div key={m.id} className="flex items-center justify-between gap-3 px-4 py-3 text-sm">
+                              <div>
+                                <div className="font-medium">
+                                  {m.name || `${m.title || ''} ${m.surname || ''} ${m.firstname || ''}`.trim()}
+                                </div>
+                                <div className="text-xs text-gray-500">
+                                  {(m.membership_no || m.membership_id || m.member_id) && (
+                                    <span className="mr-1">{m.membership_no || m.membership_id || m.member_id}</span>
+                                  )}
+                                  {m.email}
+                                </div>
+                              </div>
+                              <button
+                                type="button"
+                                onClick={() => requestSupervisor(m)}
+                                disabled={requestingId === String(m.id)}
+                                className="px-3 py-1.5 bg-indigo-500 text-white rounded-md text-xs hover:bg-indigo-600 disabled:opacity-60"
+                              >
+                                {requestingId === String(m.id) ? 'Requesting…' : 'Request'}
+                              </button>
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                </div>
+              )}
+
+              {logbook && status === 'pending' && (
+                <div className="bg-white border border-gray-200 rounded-xl p-12 text-center">
+                  <h2 className="text-2xl font-semibold text-gray-800 mb-2">Logbook Access</h2>
+                  <p className="text-sm text-gray-500">Waiting for {supervisorName || 'your supervisor'} to accept your request.</p>
+                </div>
+              )}
+
+              {logbook && status === 'rejected' && (
+                <div className="bg-white border border-gray-200 rounded-xl p-8 space-y-4">
+                  <h2 className="text-2xl font-semibold text-gray-800 mb-2">Logbook Access</h2>
+                  <p className="text-sm text-red-600">Your supervision request was rejected.</p>
+                  <p className="text-sm text-gray-500">Search and request a different supervisor below.</p>
+                  <div className="space-y-3">
+                    <div className="text-xs text-gray-600">Search Supervisor</div>
+                    <input
+                      type="text"
+                      value={supQuery}
+                      onChange={handleSupQueryChange}
+                      className="w-full px-3 py-2 border-2 border-indigo-500 rounded-lg text-sm bg-white focus:outline-none focus:border-indigo-600"
+                      placeholder="Search by membership ID or name..."
+                    />
+                    <div className="text-xs text-gray-600 mt-2">Message to Supervisor</div>
+                    <textarea
+                      value={supMessage}
+                      onChange={(e) => setSupMessage(e.target.value)}
+                      className="w-full px-3 py-2 border border-gray-200 rounded-md text-sm bg-white"
+                      rows={3}
+                      placeholder="Briefly explain why you need supervision..."
+                    />
+                    {supError && <div className="text-xs text-red-600">{supError}</div>}
+                    {supLoading && <div className="text-xs text-gray-500">Searching…</div>}
+                    {!!supResults.length && (
+                      <div className="bg-white rounded-xl border border-gray-200 overflow-hidden">
+                        <div className="max-h-64 overflow-y-auto divide-y">
+                          {supResults.map((m) => (
+                            <div key={m.id} className="flex items-center justify-between gap-3 px-4 py-3 text-sm">
+                              <div>
+                                <div className="font-medium">
+                                  {m.name || `${m.title || ''} ${m.surname || ''} ${m.firstname || ''}`.trim()}
+                                </div>
+                                <div className="text-xs text-gray-500">
+                                  {(m.membership_no || m.membership_id || m.member_id) && (
+                                    <span className="mr-1">{m.membership_no || m.membership_id || m.member_id}</span>
+                                  )}
+                                  {m.email}
+                                </div>
+                              </div>
+                              <button
+                                type="button"
+                                onClick={() => requestSupervisor(m)}
+                                disabled={requestingId === String(m.id)}
+                                className="px-3 py-1.5 bg-indigo-500 text-white rounded-md text-xs hover:bg-indigo-600 disabled:opacity-60"
+                              >
+                                {requestingId === String(m.id) ? 'Requesting…' : 'Request'}
+                              </button>
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                </div>
+              )}
+
+              {logbook && status === 'approved' && (
+                <div className="space-y-6">
+                  <div className="bg-white border border-gray-200 rounded-xl p-6">
+                    <h2 className="text-sm font-semibold text-gray-800 mb-3">Select Week</h2>
+                    <WeekDropdown value={selectedWeek} onChange={setSelectedWeek} weeks={weeks} size="md" />
+                  </div>
+
+                  <div className="bg-white border border-gray-200 rounded-xl p-6">
+                    <h2 className="text-sm font-semibold text-gray-800 mb-4">Week {selectedWeek} - Daily Entries</h2>
+                    <div className="space-y-4">
+                      {DAYS.map((day) => (
+                        <div key={day} className="p-3 rounded-lg bg-gray-50 space-y-2">
+                          <label className="block text-xs font-medium text-gray-600">{day}</label>
+                          <textarea
+                            className="w-full px-3 py-2 text-sm border border-gray-200 rounded-md bg-white"
+                            rows={3}
+                            placeholder={`Type your ${day} log...`}
+                            value={dailyText[day]}
+                            onChange={(e) => setDailyText((prev) => ({ ...prev, [day]: e.target.value }))}
+                          />
+                          <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                            <div>
+                              <label className="block text-[11px] text-gray-600 mb-1">Entry date</label>
+                              <input
+                                type="date"
+                                className="w-full px-3 py-1.5 text-xs border border-gray-200 rounded-md bg-white"
+                                value={dailyDate[day]}
+                                onChange={(e) => setDailyDate((prev) => ({ ...prev, [day]: e.target.value }))}
+                              />
+                            </div>
+                            <div>
+                              <label className="block text-[11px] text-gray-600 mb-1">Hours</label>
+                              <input
+                                type="number"
+                                min={0}
+                                step={0.5}
+                                className="w-full px-3 py-1.5 text-xs border border-gray-200 rounded-md bg-white"
+                                value={dailyHours[day]}
+                                onChange={(e) => setDailyHours((prev) => ({ ...prev, [day]: e.target.value }))}
+                              />
+                            </div>
+                          </div>
+                          <div className="mt-2 flex justify-end">
+                            <button
+                              onClick={() => { setSavingDay(day); void handleSaveDay(day).finally(() => setSavingDay(null)); }}
+                              disabled={savingDay === day || (entryMeta[day]?.status || '').toLowerCase() === 'approved'}
+                              className="px-3 py-1.5 bg-indigo-500 text-white rounded-md text-xs hover:bg-indigo-600 disabled:opacity-60 flex items-center gap-2"
+                            >
+                              {savingDay === day && (
+                                <span className="inline-block w-3 h-3 border-2 border-white border-t-transparent rounded-full animate-spin" />
+                              )}
+                              <span>{(entryMeta[day]?.status || '').toLowerCase() === 'approved' ? 'Approved' : 'Save'}</span>
+                            </button>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                </div>
+              )}
+
+              <Modal
+                open={modal.open}
+                title={modal.title}
+                onClose={() => setModal({ open: false, title: '' })}
+              >
+                {modal.message}
+              </Modal>
+            </div>
+          </div>
+        )}
       </div>
     </div>
   );

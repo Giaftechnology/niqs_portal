@@ -308,17 +308,16 @@ const ExecutiveSetDetail: React.FC = () => {
               <div className="font-medium mb-1">Assign Member</div>
               <div className="space-y-2">
                 <div>
-                  <label className="block text-xs text-gray-600 mb-1">Member ID / Search</label>
+                  <label className="block text-xs text-gray-600 mb-1">Member / Search</label>
                   <input
                     value={memberSearchQuery}
                     onChange={(e) => {
                       const v = e.target.value;
                       setMemberSearchQuery(v);
-                      setAssignForm((f) => ({ ...f, member_id: v }));
                       void searchMembers(v);
                     }}
                     className="w-full px-3 py-2 border rounded-md text-sm"
-                    placeholder="Type membership ID to search (min 3 characters)"
+                    placeholder="Type membership ID or name to search (min 3 characters)"
                     disabled={assignSubmitting}
                   />
                   {memberSearchError && (
@@ -335,9 +334,15 @@ const ExecutiveSetDetail: React.FC = () => {
                           type="button"
                           onClick={() => {
                             const uuid = m.id || m.uuid || m.user_uuid;
-                            const text = String(uuid || '');
-                            setAssignForm((f) => ({ ...f, member_id: text }));
-                            setMemberSearchQuery(text);
+                            const memberId = String(uuid || '');
+                            const displayName =
+                              m.name ||
+                              m.full_name ||
+                              `${m.title || ''} ${m.surname || ''} ${m.firstname || ''}`.trim() ||
+                              m.email ||
+                              memberId;
+                            setAssignForm((f) => ({ ...f, member_id: memberId }));
+                            setMemberSearchQuery(displayName);
                           }}
                           className="w-full text-left px-3 py-1.5 hover:bg-indigo-50"
                         >

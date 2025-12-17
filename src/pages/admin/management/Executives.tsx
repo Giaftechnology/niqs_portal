@@ -194,7 +194,15 @@ const Executives: React.FC = () => {
   };
 
   return (
-    <div className="p-4 sm:p-6">
+    <div className="relative p-4 sm:p-6 space-y-6">
+      {(loadingSets || loadingOffices) && (
+        <div className="fixed inset-0 z-40 flex items-center justify-center bg-white/70">
+          <div className="flex flex-col items-center gap-2 text-sm text-gray-700">
+            <span className="inline-block w-6 h-6 border-4 border-indigo-500 border-t-transparent rounded-full animate-spin" />
+            <span>Loading executives…</span>
+          </div>
+        </div>
+      )}
       <div className="flex items-center justify-between mb-4">
         <h1 className="text-lg font-semibold">Executive Management</h1>
         <div className="flex gap-2">
@@ -278,6 +286,7 @@ const Executives: React.FC = () => {
                     <td className="px-3 py-2">{o.description || '-'}</td>
                     <td className="px-3 py-2 text-right">
                       <div className="flex gap-2 justify-end">
+                        <button onClick={()=>navigate(`/admin/management/executive-offices/${o.id}`)} className="px-2 py-1 rounded-md border text-xs">View</button>
                         <button onClick={()=>openEditOffice(o)} className="px-2 py-1 border rounded-md text-blue-600 border-blue-200 hover:bg-blue-50">Edit</button>
                         <button onClick={()=>deleteOffice(o)} className="px-2 py-1 rounded-md bg-red-50 text-red-700 border border-red-200 hover:bg-red-100">Delete</button>
                       </div>
@@ -302,7 +311,7 @@ const Executives: React.FC = () => {
         onConfirm={() => { if (!setSubmitting) void submitSet(); }}
         confirmText={setSubmitting ? (editingSet ? 'Saving…' : 'Creating…') : (editingSet ? 'Save' : 'Create')}
         closeText={setSubmitting ? 'Close' : 'Cancel'}
-        panelClassName="max-w-xl"
+        panelClassName="max-w-3xl w-[95vw]"
         bodyClassName="!text-inherit"
       >
         <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
@@ -329,7 +338,7 @@ const Executives: React.FC = () => {
         onConfirm={() => { if (!officeSubmitting) void submitOffice(); }}
         confirmText={officeSubmitting ? (editingOffice ? 'Saving…' : 'Creating…') : (editingOffice ? 'Save' : 'Create')}
         closeText={officeSubmitting ? 'Close' : 'Cancel'}
-        panelClassName="max-w-xl"
+        panelClassName="max-w-3xl w-[95vw]"
         bodyClassName="!text-inherit"
       >
         <div className="grid grid-cols-1 gap-3">

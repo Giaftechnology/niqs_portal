@@ -160,7 +160,7 @@ const SupervisedLogbook: React.FC = () => {
 
           <div className="bg-white border border-gray-200 rounded-xl p-4">
             <h3 className="text-xs font-semibold text-gray-800 mb-3">Weeks</h3>
-            <div className="flex flex-wrap gap-2">
+            <div className="grid grid-cols-6 gap-2">
               {weeks.map((w) => {
                 const filled = !!weeksWithEntries[w];
                 const isSelected = selectedWeek === w;
@@ -169,17 +169,15 @@ const SupervisedLogbook: React.FC = () => {
                     key={w}
                     type="button"
                     onClick={() => setSelectedWeek(w)}
-                    className={`px-2.5 py-1 text-xs rounded-md border transition-colors ${
-                      filled
-                        ? isSelected
-                          ? 'bg-indigo-600 text-white border-indigo-600'
-                          : 'bg-indigo-50 text-indigo-700 border-indigo-200'
-                        : isSelected
-                          ? 'bg-gray-200 text-gray-800 border-gray-300'
+                    className={`w-full py-1 text-xs rounded-md border transition-colors ${
+                      isSelected
+                        ? 'bg-purple-800 text-white border-purple-800'
+                        : filled
+                          ? 'bg-purple-50 text-purple-700 border-purple-200'
                           : 'bg-white text-gray-600 border-gray-200'
                     }`}
                   >
-                    W{w}
+                    {w}
                   </button>
                 );
               })}

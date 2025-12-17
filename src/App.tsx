@@ -59,8 +59,10 @@ import MembershipProfileView from './pages/admin/membership/ProfileView';
 // Management pages
 import Departments from './pages/admin/management/Departments';
 import Designations from './pages/admin/management/Designations';
+import DesignationDetail from './pages/admin/management/DesignationDetail';
 import AdminsMgmt from './pages/admin/management/Admins';
 import ExecutivesMgmt from './pages/admin/management/Executives';
+import ExecutiveOfficeDetail from './pages/admin/management/ExecutiveOfficeDetail';
 import AdminDetail from './pages/admin/management/AdminDetail';
 import ExecutiveSetDetail from './pages/admin/management/ExecutiveSetDetail';
 // Applications pages
@@ -126,10 +128,12 @@ const App: React.FC = () => {
             {/* Management group */}
             <Route path="management/departments" element={<Departments />} />
             <Route path="management/designations" element={<Designations />} />
+            <Route path="management/designations/:id" element={<DesignationDetail />} />
             <Route path="management/admins" element={<AdminsMgmt />} />
             <Route path="management/admins/:id" element={<AdminDetail />} />
             <Route path="management/executives" element={<ExecutivesMgmt />} />
             <Route path="management/executives/:id" element={<ExecutiveSetDetail />} />
+            <Route path="management/executive-offices/:id" element={<ExecutiveOfficeDetail />} />
             {/* Applications group */}
             <Route path="applications" element={<ApplicationsDashboard />} />
             <Route path="applications/my" element={<MyApplication />} />

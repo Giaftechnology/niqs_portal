@@ -125,7 +125,15 @@ const Departments: React.FC = () => {
   };
 
   return (
-    <div className="p-4 sm:p-6">
+    <div className="relative p-4 sm:p-6">
+      {loading && (
+        <div className="fixed inset-0 z-40 flex items-center justify-center bg-white/70">
+          <div className="flex flex-col items-center gap-2 text-sm text-gray-700">
+            <span className="inline-block w-6 h-6 border-4 border-indigo-500 border-t-transparent rounded-full animate-spin" />
+            <span>Loading departments…</span>
+          </div>
+        </div>
+      )}
       <div className="flex items-center justify-between mb-4">
         <h1 className="text-lg font-semibold">Departments</h1>
         <button onClick={()=>{ setSuccessMsg(null); resetForm(); setShowForm(s=>!s); }} className="px-3 py-2 bg-indigo-600 text-white rounded-md text-sm">{showForm ? 'Close' : 'Add New'}</button>
@@ -145,7 +153,7 @@ const Departments: React.FC = () => {
         onConfirm={() => { if (!submitting) void doSubmit(); }}
         confirmText={submitting ? (editing ? 'Updating…' : 'Creating…') : (editing ? 'Update' : 'Create')}
         closeText={submitting ? 'Close' : 'Cancel'}
-        panelClassName="max-w-lg"
+        panelClassName="max-w-3xl w-[95vw]"
         bodyClassName="!text-inherit"
       >
         <div className="grid grid-cols-1 md:grid-cols-3 gap-3">

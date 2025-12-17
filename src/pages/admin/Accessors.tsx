@@ -16,6 +16,16 @@ const AdminAccessors: React.FC = () => {
   const [addOpen, setAddOpen] = useState(false);
   const [lookup, setLookup] = useState<LookupState>({ q: '', results: [] });
   const [lookupLoading, setLookupLoading] = useState(false);
+  const [confirm, setConfirm] = useState<{
+    open: boolean;
+    member: any | null;
+    submitting?: boolean;
+    message?: string;
+    error?: string;
+  }>({ open: false, member: null });
+  const [info, setInfo] = useState<{ open: boolean; title: string; message?: string }>(
+    { open: false, title: '' },
+  );
 
   const loadAccessors = async () => {
     setLoading(true);
@@ -77,26 +87,31 @@ const AdminAccessors: React.FC = () => {
     }
   };
 
-  const handleSelectMember = async (member: any) => {
+  const handleSelectMember = (member: any) => {
     if (!member || !member.id) return;
-    setLookupLoading(true);
+    setAddOpen(false);
+    setConfirm({ open: true, member, submitting: false, message: undefined, error: undefined });
+  };
+
+  const confirmCreateAccessor = async () => {
+    if (!confirm.member || !confirm.member.id) return;
+    setConfirm((prev) => ({ ...prev, submitting: true, message: undefined, error: undefined }));
     try {
       const res = await apiFetch<any>('/api/assessors', {
         method: 'POST',
-        body: { member_id: member.id, max_workload: 100 },
+        body: { member_id: confirm.member.id, max_workload: 100 },
       });
-      setAddOpen(false);
-      setLookup({ q: '', results: [] });
       await loadAccessors();
       const msg =
         (typeof res?.message === 'string' && res.message) ||
         (typeof res?.data?.message === 'string' && res.data.message) ||
         'Accessor created successfully.';
       setSuccess(msg);
+      setConfirm((prev) => ({ ...prev, submitting: false, open: false }));
+      setInfo({ open: true, title: 'Accessor Created', message: msg });
     } catch (e: any) {
-      setLookup((prev) => ({ ...prev, error: e?.message || 'Failed to add accessor' }));
-    } finally {
-      setLookupLoading(false);
+      const errMsg = e?.message || 'Failed to add accessor';
+      setConfirm((prev) => ({ ...prev, submitting: false, error: errMsg }));
     }
   };
 
@@ -120,7 +135,17 @@ const AdminAccessors: React.FC = () => {
   };
 
   return (
-    <div className="space-y-4">
+    <div className="relative">
+      {loading && (
+        <div className="fixed inset-0 z-40 flex items-center justify-center bg-white/70">
+          <div className="flex flex-col items-center gap-2 text-sm text-gray-700">
+            <span className="inline-block w-6 h-6 border-4 border-indigo-500 border-t-transparent rounded-full animate-spin" />
+            <span>Loading accessors…</span>
+          </div>
+        </div>
+      )}
+
+      <div className="space-y-4">
       <div className="flex items-center gap-2 text-2xl font-semibold">
         <span aria-hidden>🧑‍⚖️</span>
         <span>Accessors</span>
@@ -219,6 +244,70 @@ const AdminAccessors: React.FC = () => {
         {view.body}
       </Modal>
 
+      <Modal
+        open={confirm.open}
+        title="Confirm New Accessor"
+        onClose={() => setConfirm({ open: false, member: null })}
+      >
+        {confirm.member && (
+          <div className="space-y-3 text-sm text-gray-700">
+            <div>
+              <div className="font-medium">Member</div>
+              <div>
+                {`${confirm.member.title || ''} ${confirm.member.surname || ''} ${confirm.member.firstname || ''}`.trim() ||
+                  confirm.member.name ||
+                  confirm.member.email}
+              </div>
+              <div className="text-xs text-gray-500">
+                Membership No: {confirm.member.membership_no || confirm.member.membership_id || confirm.member.member_id || '-'}
+              </div>
+              {confirm.member.email && (
+                <div className="text-xs text-gray-500">{confirm.member.email}</div>
+              )}
+            </div>
+
+            {confirm.error && (
+              <div className="text-xs text-red-600">{confirm.error}</div>
+            )}
+            {confirm.message && (
+              <div className="text-xs text-green-700 bg-green-50 border border-green-200 rounded px-3 py-2">
+                {confirm.message}
+              </div>
+            )}
+
+            <div className="flex justify-end gap-2 pt-2">
+              <button
+                type="button"
+                onClick={() => setConfirm({ open: false, member: null })}
+                className="px-3 py-1.5 text-xs border rounded-md bg-white hover:bg-gray-50"
+                disabled={confirm.submitting}
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                onClick={() => void confirmCreateAccessor()}
+                className="px-3 py-1.5 text-xs rounded-md bg-indigo-600 text-white disabled:opacity-60 flex items-center gap-2"
+                disabled={confirm.submitting}
+              >
+                {confirm.submitting && (
+                  <span className="inline-block w-3 h-3 border-2 border-white border-t-transparent rounded-full animate-spin" />
+                )}
+                <span>Confirm Add</span>
+              </button>
+            </div>
+          </div>
+        )}
+      </Modal>
+
+      <Modal
+        open={info.open}
+        title={info.title}
+        onClose={() => setInfo({ open: false, title: '' })}
+      >
+        {info.message}
+      </Modal>
+
       <AddAccessorByMemberModal
         open={addOpen}
         lookup={lookup}
@@ -228,6 +317,7 @@ const AdminAccessors: React.FC = () => {
         onClose={() => setAddOpen(false)}
         loading={lookupLoading}
       />
+      </div>
     </div>
   );
 };
