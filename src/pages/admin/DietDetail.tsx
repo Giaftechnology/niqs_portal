@@ -22,6 +22,7 @@ const AdminDietDetail: React.FC = () => {
   const [logbookQ, setLogbookQ] = useState('');
   const [logbookStatus, setLogbookStatus] = useState<'all'|'in_progress'|'submitted'|'graded'|'failed'|'repeating'>('all');
   const [version, setVersion] = useState(0);
+  const [autoAssignLoading, setAutoAssignLoading] = useState(false);
 
   useEffect(() => {
     let ignore = false;
@@ -50,6 +51,7 @@ const AdminDietDetail: React.FC = () => {
       return;
     }
     try {
+      setAutoAssignLoading(true);
       const res = await apiFetch<any>('/api/assessors/auto-assign-logbooks', {
         method: 'POST',
         body: { assessor_id: first.id, diet_id: diet.id },
@@ -62,6 +64,8 @@ const AdminDietDetail: React.FC = () => {
       setVersion(v=>v+1);
     } catch (e: any) {
       setInfo({ open:true, title:'Auto-Assign Logbooks', message: e?.message || 'Failed to auto-assign logbooks.' });
+    } finally {
+      setAutoAssignLoading(false);
     }
   };
 
@@ -219,14 +223,18 @@ const AdminDietDetail: React.FC = () => {
   const isActive = Boolean((diet as any)?.is_active) || String((diet as any)?.status || '').toLowerCase() === 'active';
 
   const closeDiet = () => {
-    if (!id) return;
     setConfirm({
       open: true,
       title: 'Close Diet?',
-      message: `Are you sure you want to close ${diet.title || ''}?`,
+      message: `This will run the close operation for active diets. Continue?`,
       onConfirm: async () => {
         try {
-          await apiFetch(`/api/logbook-diets/${encodeURIComponent(String(id))}/close`, { method: 'POST' });
+          const res = await apiFetch<any>('/api/logbook-diets/active-close/run', { method: 'GET' });
+          const msg =
+            (typeof res?.message === 'string' && res.message) ||
+            (typeof res?.data?.message === 'string' && res.data.message) ||
+            'Diet closed.';
+          setInfo({ open: true, title: 'Diet Closed', message: msg });
           setVersion((v) => v + 1);
         } catch (e: any) {
           setInfo({ open: true, title: 'Error', message: e?.message || 'Failed to close diet.' });
@@ -291,7 +299,16 @@ const AdminDietDetail: React.FC = () => {
               <option value="name">Sort: Name</option>
               <option value="email">Sort: Email</option>
             </select>
-            <button onClick={autoAssignLogbooks} className="px-2 py-1 border rounded text-xs">Auto-Assign Logbooks</button>
+            <button
+              onClick={autoAssignLogbooks}
+              className="px-2 py-1 border rounded text-xs disabled:opacity-60 flex items-center gap-1"
+              disabled={autoAssignLoading}
+            >
+              {autoAssignLoading && (
+                <span className="inline-block w-3 h-3 border-2 border-gray-500 border-t-transparent rounded-full animate-spin" />
+              )}
+              <span>{autoAssignLoading ? 'Assigning…' : 'Auto-Assign Logbooks'}</span>
+            </button>
           </div>
         </div>
         <div className="p-3 overflow-x-auto">
@@ -462,6 +479,8 @@ const AssignAccessorModal = ({ open, dietId, q, setQ, onClose, onAssigned }: { o
   const [list, setList] = useState<any[]>([]);
   const [error, setError] = useState<string | null>(null);
   const [assigningId, setAssigningId] = useState<string | null>(null);
+  const [pendingAccessor, setPendingAccessor] = useState<any | null>(null);
+  const [confirmOpen, setConfirmOpen] = useState(false);
 
   useEffect(() => {
     const load = async () => {
@@ -489,7 +508,7 @@ const AssignAccessorModal = ({ open, dietId, q, setQ, onClose, onAssigned }: { o
     return `${name} ${email} ${membership}`.toLowerCase().includes(q.toLowerCase());
   });
 
-  const assign = async (assessorId: string) => {
+  const commitAssign = async (assessorId: string) => {
     if (!dietId) return;
     setAssigningId(assessorId);
     try {
@@ -503,6 +522,8 @@ const AssignAccessorModal = ({ open, dietId, q, setQ, onClose, onAssigned }: { o
         'Accessor assignment updated.';
       setError(null);
       onAssigned(msg);
+      setConfirmOpen(false);
+      setPendingAccessor(null);
       onClose();
     } catch (e: any) {
       setError(e?.message || 'Failed to assign assessor');
@@ -511,96 +532,156 @@ const AssignAccessorModal = ({ open, dietId, q, setQ, onClose, onAssigned }: { o
     }
   };
 
+  const requestAssign = (accessor: any) => {
+    setPendingAccessor(accessor);
+    setConfirmOpen(true);
+  };
+
   return (
-    <Modal open={true} title="Assign Accessor" onClose={onClose} panelClassName="max-w-2xl w-[90vw] max-h-[80vh]" bodyClassName="overflow-y-auto max-h-[60vh] pr-1">
-      <div className="space-y-3">
-        <input value={q} onChange={e=>setQ(e.target.value)} placeholder="Search assessors" className="w-full px-3 py-2 border rounded-md text-sm" />
-        {error && <div className="text-xs text-red-600">{error}</div>}
-        <div className="max-h-60 overflow-auto border rounded-md">
-          {loading ? (
-            <div className="p-3 text-xs text-gray-500">Loading assessors…</div>
-          ) : (
+    <>
+      <Modal open={true} title="Assign Accessor" onClose={onClose} panelClassName="max-w-2xl w-[90vw] max-h-[80vh]" bodyClassName="overflow-y-auto max-h-[60vh] pr-1">
+        <div className="space-y-3">
+          <input value={q} onChange={e=>setQ(e.target.value)} placeholder="Search assessors" className="w-full px-3 py-2 border rounded-md text-sm" />
+          {error && <div className="text-xs text-red-600">{error}</div>}
+          <div className="max-h-60 overflow-auto border rounded-md">
+            {loading ? (
+              <div className="p-3 text-xs text-gray-500">Loading assessors…</div>
+            ) : (
+              <table className="w-full text-sm">
+                <thead>
+                  <tr className="text-left">
+                    <th className="p-2">Membership No</th>
+                    <th className="p-2">Name</th>
+                    <th className="p-2">Email</th>
+                    <th className="p-2">Action</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {filtered.map((a) => {
+                    const accessorId = a.assessor_id || a.id;
+                    return (
+                    <tr key={accessorId} className="border-t">
+                      <td className="p-2">{a.member?.membership_no || '-'}</td>
+                      <td className="p-2">{`${a.member?.title || ''} ${a.member?.surname || ''} ${a.member?.firstname || ''}`.trim() || '-'}</td>
+                      <td className="p-2">{a.member?.email || '-'}</td>
+                      <td className="p-2">
+                        <button
+                          onClick={()=>requestAssign(a)}
+                          className="px-2 py-1 text-xs bg-indigo-600 text-white rounded disabled:opacity-60"
+                          disabled={Boolean(assigningId)}
+                        >
+                          {assigningId === accessorId ? 'Assigning…' : 'Assign'}
+                        </button>
+                      </td>
+                    </tr>
+                  );})}
+                  {filtered.length === 0 && !loading && (
+                    <tr><td className="p-2 text-xs text-gray-500" colSpan={4}>No assessors match your search.</td></tr>
+                  )}
+                </tbody>
+              </table>
+            )}
+          </div>
+        </div>
+      </Modal>
+
+      <Modal
+        open={confirmOpen && !!pendingAccessor}
+        title="Confirm Accessor Assignment"
+        onClose={()=>{ setConfirmOpen(false); setPendingAccessor(null); }}
+        onConfirm={()=> pendingAccessor && commitAssign(pendingAccessor.assessor_id || pendingAccessor.id)}
+        confirmText="Proceed"
+      >
+        {pendingAccessor && (
+          <div className="text-sm space-y-2">
+            <p>Assign accessor:</p>
+            <div className="border rounded-md p-2 text-xs space-y-1">
+              <div><span className="font-semibold">Membership:</span> {pendingAccessor.member?.membership_no || '-'}</div>
+              <div><span className="font-semibold">Name:</span> {`${pendingAccessor.member?.title || ''} ${pendingAccessor.member?.surname || ''} ${pendingAccessor.member?.firstname || ''}`.trim() || '-'}</div>
+              <div><span className="font-semibold">Email:</span> {pendingAccessor.member?.email || '-'}</div>
+            </div>
+            <p>This accessor will be assigned to the current diet.</p>
+          </div>
+        )}
+      </Modal>
+    </>
+  );
+};
+
+const AssignSupervisorModal = ({ open, studentEmail, q, setQ, onClose }: { open: boolean; studentEmail?: string; q: string; setQ: (v:string)=>void; onClose: ()=>void }) => {
+  const [pendingSup, setPendingSup] = useState<any | null>(null);
+  const [confirmOpen, setConfirmOpen] = useState(false);
+
+  if (!open || !studentEmail) return null;
+  const suUsers = AdminStore.listSupervisorUsers();
+  const filtered = suUsers.filter(s=> `${s.name} ${s.email}`.toLowerCase().includes(q.toLowerCase()));
+
+  const commitAssign = (supId: string) => {
+    const list = AdminStore.listSupervisors();
+    const existing = list.find(p=>p.id===supId) || { id: supId, students: [] };
+    const set = new Set(existing.students);
+    set.add(studentEmail);
+    AdminStore.upsertSupervisor({ id: supId, students: Array.from(set) });
+    setConfirmOpen(false);
+    setPendingSup(null);
+    onClose();
+  };
+
+  const requestAssign = (sup: any) => {
+    setPendingSup(sup);
+    setConfirmOpen(true);
+  };
+
+  return (
+    <>
+      <Modal open={true} title={`Assign Supervisor for ${studentEmail}`} onClose={onClose} panelClassName="max-w-2xl w-[90vw] max-h-[80vh]" bodyClassName="overflow-y-auto max-h-[60vh] pr-1">
+        <div className="space-y-3">
+          <input value={q} onChange={e=>setQ(e.target.value)} placeholder="Search supervisors" className="w-full px-3 py-2 border rounded-md text-sm" />
+          <div className="max-h-60 overflow-auto border rounded-md">
             <table className="w-full text-sm">
               <thead>
                 <tr className="text-left">
-                  <th className="p-2">Membership No</th>
                   <th className="p-2">Name</th>
                   <th className="p-2">Email</th>
                   <th className="p-2">Action</th>
                 </tr>
               </thead>
               <tbody>
-                {filtered.map((a) => {
-                  const accessorId = a.assessor_id || a.id;
-                  return (
-                  <tr key={accessorId} className="border-t">
-                    <td className="p-2">{a.member?.membership_no || '-'}</td>
-                    <td className="p-2">{`${a.member?.title || ''} ${a.member?.surname || ''} ${a.member?.firstname || ''}`.trim() || '-'}</td>
-                    <td className="p-2">{a.member?.email || '-'}</td>
+                {filtered.map(s => (
+                  <tr key={s.id} className="border-t">
+                    <td className="p-2">{s.name}</td>
+                    <td className="p-2">{s.email}</td>
                     <td className="p-2">
-                      <button
-                        onClick={()=>void assign(accessorId)}
-                        className="px-2 py-1 text-xs bg-indigo-600 text-white rounded disabled:opacity-60"
-                        disabled={Boolean(assigningId)}
-                      >
-                        {assigningId === accessorId ? 'Assigning…' : 'Assign'}
+                      <button onClick={()=>requestAssign(s)} className="px-2 py-1 text-xs bg-indigo-600 text-white rounded">
+                        Assign
                       </button>
                     </td>
                   </tr>
-                );})}
-                {filtered.length === 0 && !loading && (
-                  <tr><td className="p-2 text-xs text-gray-500" colSpan={4}>No assessors match your search.</td></tr>
+                ))}
+                {filtered.length===0 && (
+                  <tr><td className="p-2 text-xs text-gray-500" colSpan={3}>No supervisors match your search.</td></tr>
                 )}
               </tbody>
             </table>
-          )}
+          </div>
         </div>
-      </div>
-    </Modal>
-  );
-};
+      </Modal>
 
-const AssignSupervisorModal = ({ open, studentEmail, q, setQ, onClose }: { open: boolean; studentEmail?: string; q: string; setQ: (v:string)=>void; onClose: ()=>void }) => {
-  if (!open || !studentEmail) return null;
-  const suUsers = AdminStore.listSupervisorUsers();
-  const filtered = suUsers.filter(s=> `${s.name} ${s.email}`.toLowerCase().includes(q.toLowerCase()));
-  const assign = (supId: string) => {
-    const list = AdminStore.listSupervisors();
-    const existing = list.find(p=>p.id===supId) || { id: supId, students: [] };
-    const set = new Set(existing.students);
-    set.add(studentEmail);
-    AdminStore.upsertSupervisor({ id: supId, students: Array.from(set) });
-    onClose();
-  };
-  return (
-    <Modal open={true} title={`Assign Supervisor for ${studentEmail}`} onClose={onClose} panelClassName="max-w-2xl w-[90vw] max-h-[80vh]" bodyClassName="overflow-y-auto max-h-[60vh] pr-1">
-      <div className="space-y-3">
-        <input value={q} onChange={e=>setQ(e.target.value)} placeholder="Search supervisors" className="w-full px-3 py-2 border rounded-md text-sm" />
-        <div className="max-h-60 overflow-auto border rounded-md">
-          <table className="w-full text-sm">
-            <thead>
-              <tr className="text-left">
-                <th className="p-2">Name</th>
-                <th className="p-2">Email</th>
-                <th className="p-2">Action</th>
-              </tr>
-            </thead>
-            <tbody>
-              {filtered.map(s => (
-                <tr key={s.id} className="border-t">
-                  <td className="p-2">{s.name}</td>
-                  <td className="p-2">{s.email}</td>
-                  <td className="p-2"><button onClick={()=>assign(s.id)} className="px-2 py-1 text-xs bg-indigo-600 text-white rounded">Assign</button></td>
-                </tr>
-              ))}
-              {filtered.length===0 && (
-                <tr><td className="p-2 text-xs text-gray-500" colSpan={3}>No supervisors match your search.</td></tr>
-              )}
-            </tbody>
-          </table>
-        </div>
-      </div>
-    </Modal>
+      <Modal
+        open={confirmOpen && !!pendingSup}
+        title="Confirm Supervisor Assignment"
+        onClose={()=>{ setConfirmOpen(false); setPendingSup(null); }}
+        onConfirm={()=> pendingSup && commitAssign(pendingSup.id)}
+        confirmText="Confirm"
+      >
+        {pendingSup && (
+          <div className="text-sm space-y-2">
+            <p>Assign <span className="font-semibold">{pendingSup.name}</span> ({pendingSup.email})</p>
+            <p>as supervisor for <span className="font-semibold">{studentEmail}</span>?</p>
+          </div>
+        )}
+      </Modal>
+    </>
   );
 };
 

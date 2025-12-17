@@ -268,46 +268,79 @@ const AdminDietManagement: React.FC = () => {
 };
 
 const AssignSupervisorModal = ({ open, studentEmail, q, setQ, onClose }: { open: boolean; studentEmail?: string; q: string; setQ: (v:string)=>void; onClose: ()=>void }) => {
+  const [pendingSup, setPendingSup] = useState<any | null>(null);
+  const [confirmOpen, setConfirmOpen] = useState(false);
+
   if (!open || !studentEmail) return null;
   const suUsers = AdminStore.listSupervisorUsers();
   const filtered = suUsers.filter(s=> `${s.name} ${s.email}`.toLowerCase().includes(q.toLowerCase()));
-  const assign = (supId: string) => {
+
+  const commitAssign = (supId: string) => {
     const list = AdminStore.listSupervisors();
     const existing = list.find(p=>p.id===supId) || { id: supId, students: [] };
     const set = new Set(existing.students);
     set.add(studentEmail);
     AdminStore.upsertSupervisor({ id: supId, students: Array.from(set) });
+    setConfirmOpen(false);
+    setPendingSup(null);
     onClose();
   };
+
+  const requestAssign = (sup: any) => {
+    setPendingSup(sup);
+    setConfirmOpen(true);
+  };
+
   return (
-    <Modal open={true} title={`Assign Supervisor for ${studentEmail}`} onClose={onClose} panelClassName="max-w-2xl w-[90vw] max-h-[80vh]" bodyClassName="overflow-y-auto max-h-[60vh] pr-1">
-      <div className="space-y-3">
-        <input value={q} onChange={e=>setQ(e.target.value)} placeholder="Search supervisors" className="w-full px-3 py-2 border rounded-md text-sm" />
-        <div className="max-h-60 overflow-auto border rounded-md">
-          <table className="w-full text-sm">
-            <thead>
-              <tr className="text-left">
-                <th className="p-2">Name</th>
-                <th className="p-2">Email</th>
-                <th className="p-2">Action</th>
-              </tr>
-            </thead>
-            <tbody>
-              {filtered.map(s => (
-                <tr key={s.id} className="border-t">
-                  <td className="p-2">{s.name}</td>
-                  <td className="p-2">{s.email}</td>
-                  <td className="p-2"><button onClick={()=>assign(s.id)} className="px-2 py-1 text-xs bg-indigo-600 text-white rounded">Assign</button></td>
+    <>
+      <Modal open={true} title={`Assign Supervisor for ${studentEmail}`} onClose={onClose} panelClassName="max-w-2xl w-[90vw] max-h-[80vh]" bodyClassName="overflow-y-auto max-h-[60vh] pr-1">
+        <div className="space-y-3">
+          <input value={q} onChange={e=>setQ(e.target.value)} placeholder="Search supervisors" className="w-full px-3 py-2 border rounded-md text-sm" />
+          <div className="max-h-60 overflow-auto border rounded-md">
+            <table className="w-full text-sm">
+              <thead>
+                <tr className="text-left">
+                  <th className="p-2">Name</th>
+                  <th className="p-2">Email</th>
+                  <th className="p-2">Action</th>
                 </tr>
-              ))}
-              {filtered.length===0 && (
-                <tr><td className="p-2 text-xs text-gray-500" colSpan={3}>No supervisors match your search.</td></tr>
-              )}
-            </tbody>
-          </table>
+              </thead>
+              <tbody>
+                {filtered.map(s => (
+                  <tr key={s.id} className="border-t">
+                    <td className="p-2">{s.name}</td>
+                    <td className="p-2">{s.email}</td>
+                    <td className="p-2">
+                      <button onClick={()=>requestAssign(s)} className="px-2 py-1 text-xs bg-indigo-600 text-white rounded">
+                        Assign
+                      </button>
+                    </td>
+                  </tr>
+                ))}
+                {filtered.length===0 && (
+                  <tr><td className="p-2 text-xs text-gray-500" colSpan={3}>No supervisors match your search.</td></tr>
+                )}
+              </tbody>
+            </table>
+          </div>
         </div>
-      </div>
-    </Modal>
+      </Modal>
+
+      <Modal
+        open={confirmOpen && !!pendingSup}
+        title="Confirm Supervisor Assignment"
+        onClose={()=>{ setConfirmOpen(false); setPendingSup(null); }}
+        onConfirm={()=> pendingSup && commitAssign(pendingSup.id)}
+        confirmText="Proceed"
+      >
+        {pendingSup && (
+          <div className="text-sm space-y-2">
+            <p>Assign <span className="font-semibold">{pendingSup.name}</span> ({pendingSup.email})</p>
+            <p>as supervisor for <span className="font-semibold">{studentEmail}</span>?</p>
+          </div>
+        )}
+      </Modal>
+    </>
   );
 };
 
