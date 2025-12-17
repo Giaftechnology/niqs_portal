@@ -73,13 +73,15 @@ const AdminDietManagement: React.FC = () => {
     if (!createForm.title.trim() || !createForm.start_date || !createForm.end_date) { setFormError('Title, start and end date are required'); return; }
     setCreating(true); setFormError(null);
     try {
-      const res = await apiFetch('/api/logbook-diets', { method: 'POST', body: { ...createForm } });
-      const ok = Boolean(res?.data?.id || res?.id || typeof res?.message === 'string');
-      if (!ok) throw new Error(res?.message || 'Create failed');
+      const res = await apiFetch<any>('/api/logbook-diets', { method: 'POST', body: { ...createForm } });
+      const msg =
+        (typeof res?.message === 'string' && res.message) ||
+        (typeof res?.data?.message === 'string' && res.data.message) ||
+        'Diet created.';
       setCreateOpen(false);
       await fetchList();
-      try { const ev = new CustomEvent('global-alert', { detail: { title: 'Success', message: 'Diet created (pending approval).' } }); window.dispatchEvent(ev); document.dispatchEvent(ev); } catch {}
-      setSuccessMsg('Diet created (pending approval).');
+      try { const ev = new CustomEvent('global-alert', { detail: { title: 'Success', message: msg } }); window.dispatchEvent(ev); document.dispatchEvent(ev); } catch {}
+      setSuccessMsg(msg);
     } catch (e: any) { setFormError(e?.message || 'Request failed'); }
     finally { setCreating(false); }
   };
@@ -206,7 +208,7 @@ const AdminDietManagement: React.FC = () => {
         onConfirm={()=>{ if (!creating) void submitCreate(); }}
         confirmText={creating ? 'Creating…' : 'Create'}
         closeText={creating ? 'Close' : 'Cancel'}
-        panelClassName="max-w-xl"
+        panelClassName="max-w-3xl w-[90vw]"
         bodyClassName="!text-inherit"
       >
         <div className="grid grid-cols-1 gap-3">

@@ -40,7 +40,7 @@ const AdminDietDetail: React.FC = () => {
     };
     load();
     return () => { ignore = true; };
-  }, [id]);
+  }, [id, version]);
 
   const autoAssignLogbooks = async () => {
     if (!diet?.id) return;

@@ -11,6 +11,8 @@ const RolesPage: React.FC = () => {
   const [modal, setModal] = useState<{open:boolean;title:string;message?:string;onConfirm?:()=>void}>({open:false,title:''});
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [creating, setCreating] = useState(false);
+  const [successMsg, setSuccessMsg] = useState<string | null>(null);
 
   const loadRoles = async () => {
     setLoading(true); setError(null);
@@ -50,14 +52,23 @@ const RolesPage: React.FC = () => {
         const name = v.trim();
         if (!name) return;
         try {
-          await apiFetch('/api/access/roles', {
+          setCreating(true);
+          const res = await apiFetch<any>('/api/access/roles', {
             method: 'POST',
             body: { name },
           });
+          const msg =
+            (typeof res?.message === 'string' && res.message) ||
+            (typeof res?.data?.message === 'string' && res.data.message) ||
+            'Role created.';
           await loadRoles();
+          setSuccessMsg(msg);
           setInputModal({ open: false, title: '' });
         } catch (e: any) {
+          setSuccessMsg(null);
           setModal({ open:true, title:'Error', message: e?.message || 'Failed to create role.' });
+        } finally {
+          setCreating(false);
         }
       },
     });
@@ -79,6 +90,9 @@ const RolesPage: React.FC = () => {
       </div>
       {error && (
         <div className="p-3 border rounded-md bg-red-50 text-red-700 border-red-200 text-sm">{error}</div>
+      )}
+      {successMsg && (
+        <div className="p-3 border rounded-md bg-green-50 text-green-700 border-green-200 text-sm">{successMsg}</div>
       )}
       <div className="bg-white border rounded-xl">
         <table className="w-full text-sm">
@@ -110,8 +124,9 @@ const RolesPage: React.FC = () => {
           title={inputModal.title}
           initial={inputModal.initial}
           placeholder={inputModal.placeholder}
-          onClose={() => setInputModal({ open: false, title: '' })}
+          onClose={() => { if (!creating) setInputModal({ open: false, title: '' }); }}
           onSave={inputModal.onSave}
+          saving={creating}
         />
       )}
     </div>
@@ -120,11 +135,28 @@ const RolesPage: React.FC = () => {
 
 export default RolesPage;
 
-const NameInputModal = ({ title, initial = '', placeholder, onSave, onClose }: { title: string; initial?: string; placeholder?: string; onSave?: (v: string)=>void; onClose: ()=>void }) => {
+const NameInputModal = ({ title, initial = '', placeholder, onSave, onClose, saving }: { title: string; initial?: string; placeholder?: string; onSave?: (v: string)=>void; onClose: ()=>void; saving?: boolean }) => {
   const [val, setVal] = useState(initial);
+  const handleConfirm = () => {
+    if (saving) return;
+    if (onSave) onSave(val);
+  };
   return (
-    <Modal open={true} title={title} onClose={onClose} onConfirm={() => onSave && onSave(val)} confirmText="Save">
-      <input autoFocus value={val} onChange={e=>setVal(e.target.value)} placeholder={placeholder} className="w-full px-3 py-2 border rounded-md text-sm" />
+    <Modal
+      open={true}
+      title={title}
+      onClose={onClose}
+      onConfirm={handleConfirm}
+      confirmText={saving ? 'Saving…' : 'Save'}
+    >
+      <input
+        autoFocus
+        value={val}
+        onChange={e=>setVal(e.target.value)}
+        placeholder={placeholder}
+        className="w-full px-3 py-2 border rounded-md text-sm"
+        disabled={saving}
+      />
     </Modal>
   );
 };
