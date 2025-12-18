@@ -133,6 +133,25 @@ const ProbationerNew: React.FC = () => {
   ]);
   const [refSearch, setRefSearch] = useState<Array<{ q: string; loading: boolean; results: any[]; error: string | null; selected?: any }>>([]);
 
+  // Ensure at least one seminar & referee row always exist
+  useEffect(() => {
+    setS6(prev => (prev && prev.length ? prev : [{ title: '', date: '', location: '' }]));
+  }, []);
+  useEffect(() => {
+    setS7(prev => (prev && prev.length ? prev : [{ user_id: '', relationship: '' }]));
+  }, []);
+  // Keep refSearch array in sync with s7 length so first referee row always has search state
+  useEffect(() => {
+    setRefSearch(prev => {
+      const next = [...prev];
+      while (next.length < s7.length) {
+        next.push({ q: '', loading: false, results: [], error: null, selected: undefined });
+      }
+      if (next.length > s7.length) next.length = s7.length;
+      return next;
+    });
+  }, [s7.length]);
+
   const canGoNext = useMemo(() => !busy, [busy]);
   const resumeId = useMemo(() => {
     try { return new URLSearchParams(location.search).get('id'); } catch { return null; }
@@ -164,8 +183,8 @@ const ProbationerNew: React.FC = () => {
       if (Array.isArray(data?.s3)) setS3(data.s3);
       if (Array.isArray(data?.s4)) setS4(data.s4);
       if (Array.isArray(data?.s5)) setS5(data.s5);
-      if (Array.isArray(data?.s6)) setS6(data.s6);
-      if (Array.isArray(data?.s7)) setS7(data.s7);
+      if (Array.isArray(data?.s6)) setS6(data.s6.length ? data.s6 : [{ title: '', date: '', location: '' }]);
+      if (Array.isArray(data?.s7)) setS7(data.s7.length ? data.s7 : [{ user_id: '', relationship: '' }]);
       if (data?.step) setStep(Number(data.step) || 1);
       if (data?.appId) setAppId(String(data.appId));
       return true;
@@ -363,7 +382,8 @@ const ProbationerNew: React.FC = () => {
           setS6(prev => {
             if (cancelled) return prev;
             const isEmpty = prev.length === 1 && !prev[0].title && !prev[0].date && !prev[0].location;
-            return isEmpty ? sems : prev;
+            const next = isEmpty ? sems : prev;
+            return next.length ? next : [{ title: '', date: '', location: '' }];
           });
         }
         // Step 7: referees
@@ -375,7 +395,8 @@ const ProbationerNew: React.FC = () => {
           setS7(prev => {
             if (cancelled) return prev;
             const isEmpty = prev.length === 1 && !prev[0].user_id && !prev[0].relationship;
-            return isEmpty ? refs : prev;
+            const next = isEmpty ? refs : prev;
+            return next.length ? next : [{ user_id: '', relationship: '' }];
           });
         }
         // Step jump
@@ -780,7 +801,7 @@ const ProbationerNew: React.FC = () => {
                   {row.certName || (row.certFile ? row.certFile.name : 'Drag & drop image/PDF, or click to select (PDF, JPG/PNG/WebP, max 10MB)')}
                 </div>
                 <input id={`cert_file_${i}`} type="file" accept="image/*,application/pdf" onChange={onPickCert(i)} className="hidden" disabled={busy} />
-                {row.certPreview && row.certFile && row.certFile.type?.startsWith('image') && (
+                {row.certPreview && (
                   <div className="mt-2">
                     <img src={row.certPreview} alt="Certificate preview" className="h-24 object-contain rounded border" />
                   </div>
@@ -1026,12 +1047,7 @@ const ProbationerNew: React.FC = () => {
                     <div><span className="text-gray-500">Institution:</span> {q.institution || '-'}</div>
                     <div><span className="text-gray-500">Qualification:</span> {q.qualification || '-'}</div>
                     <div><span className="text-gray-500">Year:</span> {q.year || '-'}</div>
-                    <div><span className="text-gray-500">Certificate File:</span> {q.certFile ? q.certFile.name : '-'}</div>
-                    {q.certPreview && q.certFile && q.certFile.type?.startsWith('image') && (
-                      <div>
-                        <img src={q.certPreview} alt="Certificate preview" className="h-20 object-contain rounded border bg-white" />
-                      </div>
-                    )}
+                    <div><span className="text-gray-500">Certificate File:</span> {q.certFile ? q.certFile.name : (q.certName || '-')}</div>
                   </div>
                 )) : <div>-</div>}
               </div>

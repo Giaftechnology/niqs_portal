@@ -1,5 +1,6 @@
 import React, { useMemo, useState, useEffect } from 'react';
 import { Link, useNavigate, useParams } from 'react-router-dom';
+import { Users, BookOpen, FileText, CheckCircle2, XCircle, Repeat } from 'lucide-react';
 import Modal from '../../components/Modal';
 import StatusPill from '../../components/StatusPill';
 import { apiFetch } from '../../utils/api';
@@ -16,13 +17,16 @@ const AdminDietDetail: React.FC = () => {
   const [assignQ, setAssignQ] = useState('');
   const [supPick, setSupPick] = useState<{open:boolean; studentEmail?:string}>({open:false});
   const [supQ, setSupQ] = useState('');
-  const [confirm, setConfirm] = useState<{open:boolean; title:string; message?:string; onConfirm?:()=>void}>({open:false,title:''});
+  const [confirm, setConfirm] = useState<{open:boolean; title:string; message?:string; onConfirm?:()=>void; confirmText?: string}>({open:false,title:''});
   const [accQ, setAccQ] = useState('');
   const [accSort, setAccSort] = useState<'name'|'email'>('name');
   const [logbookQ, setLogbookQ] = useState('');
   const [logbookStatus, setLogbookStatus] = useState<'all'|'in_progress'|'submitted'|'graded'|'failed'|'repeating'>('all');
   const [version, setVersion] = useState(0);
   const [autoAssignLoading, setAutoAssignLoading] = useState(false);
+  const [reopenLoading, setReopenLoading] = useState(false);
+  const [closeLoading, setCloseLoading] = useState(false);
+  const [applicationSort, setApplicationSort] = useState<'name' | 'status'>('name');
 
   useEffect(() => {
     let ignore = false;
@@ -229,6 +233,7 @@ const AdminDietDetail: React.FC = () => {
       message: `This will run the close operation for active diets. Continue?`,
       onConfirm: async () => {
         try {
+          setCloseLoading(true);
           const res = await apiFetch<any>('/api/logbook-diets/active-close/run', { method: 'GET' });
           const msg =
             (typeof res?.message === 'string' && res.message) ||
@@ -240,19 +245,40 @@ const AdminDietDetail: React.FC = () => {
           setInfo({ open: true, title: 'Error', message: e?.message || 'Failed to close diet.' });
         } finally {
           setConfirm({ open: false, title: '' });
+          setCloseLoading(false);
         }
       },
+      confirmText: 'Yes, Close',
     });
   };
 
-  const openDiet = async () => {
+  const performReopenDiet = async () => {
     if (!id) return;
+    setReopenLoading(true);
     try {
-      await apiFetch(`/api/logbook-diets/${encodeURIComponent(String(id))}/reopen`, { method: 'POST' });
+      const res = await apiFetch<any>(`/api/logbook-diets/${encodeURIComponent(String(id))}/open`, { method: 'POST' });
+      const msg =
+        (typeof res?.message === 'string' && res.message) ||
+        (typeof res?.data?.message === 'string' && res.data.message) ||
+        'Diet reopened.';
+      setInfo({ open: true, title: 'Diet Reopened', message: msg });
       setVersion((v) => v + 1);
     } catch (e: any) {
       setInfo({ open: true, title: 'Error', message: e?.message || 'Failed to reopen diet.' });
+    } finally {
+      setReopenLoading(false);
+      setConfirm({ open: false, title: '' });
     }
+  };
+
+  const openDiet = () => {
+    setConfirm({
+      open: true,
+      title: 'Reopen Diet?',
+      message: 'This will reopen this diet and make it active again. Continue?',
+      onConfirm: () => { void performReopenDiet(); },
+      confirmText: 'Yes, Reopen',
+    });
   };
 
   return (
@@ -272,22 +298,42 @@ const AdminDietDetail: React.FC = () => {
             <span className="text-xs px-2 py-0.5 rounded bg-gray-100 text-gray-600">Inactive</span>
           )}
           {isActive && (
-            <button onClick={closeDiet} className="px-3 py-1.5 text-sm border rounded-md border-red-300 text-red-700">Close Diet</button>
+            <button
+              onClick={closeDiet}
+              disabled={closeLoading}
+              aria-busy={closeLoading}
+              className="px-3 py-1.5 text-sm border rounded-md border-red-300 text-red-700 disabled:opacity-60 flex items-center gap-2"
+            >
+              {closeLoading && (
+                <span className="inline-block w-3 h-3 border-2 border-red-700 border-t-transparent rounded-full animate-spin" />
+              )}
+              <span>{closeLoading ? 'Closing…' : 'Close Diet'}</span>
+            </button>
           )}
           {!isActive && (
-            <button onClick={openDiet} className="px-3 py-1.5 text-sm border rounded-md border-green-300 text-green-700">Reopen Diet</button>
+            <button
+              onClick={openDiet}
+              disabled={reopenLoading}
+              aria-busy={reopenLoading}
+              className="px-3 py-1.5 text-sm border rounded-md border-green-300 text-green-700 disabled:opacity-60 flex items-center gap-2"
+            >
+              {reopenLoading && (
+                <span className="inline-block w-3 h-3 border-2 border-green-700 border-t-transparent rounded-full animate-spin" />
+              )}
+              <span>{reopenLoading ? 'Reopening…' : 'Reopen Diet'}</span>
+            </button>
           )}
           <button onClick={()=>setAssignOpen(true)} className="px-3 py-1.5 text-sm bg-indigo-600 text-white rounded-md">Start Assessment / Assign Accessor</button>
         </div>
       </div>
 
       <div className="grid grid-cols-2 sm:grid-cols-6 gap-3">
-        <Stat title="Accessors" value={assessorRows.length} />
-        <Stat title="Logbooks" value={stats.totalLogbooks} />
-        <Stat title="Applications" value={stats.totalApplications} />
-        <Stat title="Passed" value={stats.passed} />
-        <Stat title="Failed" value={stats.failed} />
-        <Stat title="Repeating" value={stats.repeating} />
+        <Stat title="Accessors" value={assessorRows.length} icon={<Users size={16} />} />
+        <Stat title="Logbooks" value={stats.totalLogbooks} icon={<BookOpen size={16} />} />
+        <Stat title="Applications" value={stats.totalApplications} icon={<FileText size={16} />} />
+        <Stat title="Passed" value={stats.passed} icon={<CheckCircle2 size={16} />} />
+        <Stat title="Failed" value={stats.failed} icon={<XCircle size={16} />} />
+        <Stat title="Repeating" value={stats.repeating} icon={<Repeat size={16} />} />
       </div>
 
       <section className="border rounded-xl bg-white">
@@ -318,7 +364,6 @@ const AdminDietDetail: React.FC = () => {
                 <th className="p-2">Membership No</th>
                 <th className="p-2">Name</th>
                 <th className="p-2">Email</th>
-                <th className="p-2">Max Workload</th>
                 <th className="p-2">Action</th>
               </tr>
             </thead>
@@ -335,7 +380,6 @@ const AdminDietDetail: React.FC = () => {
                     <td className="p-2">{a.member?.membership_no || '-'}</td>
                     <td className="p-2">{`${a.member?.title || ''} ${a.member?.surname || ''} ${a.member?.firstname || ''}`.trim() || '-'}</td>
                     <td className="p-2">{a.member?.email || '-'}</td>
-                    <td className="p-2">{a.max_workload ?? '-'}</td>
                     <td className="p-2">
                       <button
                         className="px-2 py-1 text-xs border rounded"
@@ -347,7 +391,7 @@ const AdminDietDetail: React.FC = () => {
                   </tr>
                 ))}
               {assessorRows.length === 0 && (
-                <tr><td className="p-2 text-xs text-gray-500" colSpan={5}>No assessors assigned yet.</td></tr>
+                <tr><td className="p-2 text-xs text-gray-500" colSpan={4}>No assessors assigned yet.</td></tr>
               )}
             </tbody>
           </table>
@@ -417,6 +461,17 @@ const AdminDietDetail: React.FC = () => {
       <section className="border rounded-xl bg-white">
         <div className="p-3 text-sm font-medium border-b flex items-center justify-between">
           <span>Applications in this Diet</span>
+          <div className="flex items-center gap-2 text-xs">
+            <span className="text-gray-500">Sort:</span>
+            <select
+              value={applicationSort}
+              onChange={(e) => setApplicationSort(e.target.value as 'name' | 'status')}
+              className="px-2 py-1 border rounded"
+            >
+              <option value="name">Applicant Name</option>
+              <option value="status">Status</option>
+            </select>
+          </div>
         </div>
         <div className="p-3 overflow-x-auto">
           <table className="w-full text-sm">
@@ -428,15 +483,26 @@ const AdminDietDetail: React.FC = () => {
               </tr>
             </thead>
             <tbody>
-              {applications.map((a) => (
-                <tr key={a.id} className="border-t">
-                  <td className="p-2">{`${a.title || ''} ${a.surname || ''} ${a.other_names || ''}`.trim()}</td>
-                  <td className="p-2">{a.email}</td>
-                  <td className="p-2">
-                    <StatusPill status={String(a.status || 'pending') as any} />
-                  </td>
-                </tr>
-              ))}
+              {[...applications]
+                .sort((a, b) => {
+                  if (applicationSort === 'status') {
+                    const sa = String(a.status || '').toLowerCase();
+                    const sb = String(b.status || '').toLowerCase();
+                    return sa.localeCompare(sb);
+                  }
+                  const na = `${a.title || ''} ${a.surname || ''} ${a.other_names || ''}`.trim();
+                  const nb = `${b.title || ''} ${b.surname || ''} ${b.other_names || ''}`.trim();
+                  return na.localeCompare(nb);
+                })
+                .map((a) => (
+                  <tr key={a.id} className="border-t">
+                    <td className="p-2">{`${a.title || ''} ${a.surname || ''} ${a.other_names || ''}`.trim()}</td>
+                    <td className="p-2">{a.email}</td>
+                    <td className="p-2">
+                      <StatusPill status={String(a.status || 'pending') as any} />
+                    </td>
+                  </tr>
+                ))}
               {applications.length === 0 && (
                 <tr><td className="p-2 text-xs text-gray-500" colSpan={3}>No applications for this diet.</td></tr>
               )}
@@ -457,7 +523,7 @@ const AdminDietDetail: React.FC = () => {
         }}
       />
       <AssignSupervisorModal open={supPick.open} studentEmail={supPick.studentEmail} q={supQ} setQ={setSupQ} onClose={()=>{ setSupPick({open:false}); setSupQ(''); }} />
-      <Modal open={confirm.open} title={confirm.title} onClose={()=>setConfirm({open:false,title:''})} onConfirm={confirm.onConfirm} confirmText="Yes, Close">
+      <Modal open={confirm.open} title={confirm.title} onClose={()=>setConfirm({open:false,title:''})} onConfirm={confirm.onConfirm} confirmText={confirm.confirmText || 'Yes, Close'}>
         {confirm.message}
       </Modal>
       <Modal open={info.open} title={info.title} onClose={()=>setInfo({open:false,title:''})}>
@@ -467,10 +533,17 @@ const AdminDietDetail: React.FC = () => {
   );
 };
 
-const Stat = ({ title, value }: { title: string; value: number }) => (
-  <div className="bg-white border border-gray-200 rounded-xl p-3">
-    <div className="text-[11px] text-gray-500">{title}</div>
-    <div className="text-lg font-semibold text-gray-800">{value}</div>
+type StatProps = { title: string; value: number; icon: React.ReactNode };
+
+const Stat = ({ title, value, icon }: StatProps) => (
+  <div className="bg-white border border-gray-200 rounded-xl p-3 flex items-center gap-3">
+    <div className="h-8 w-8 rounded-lg bg-indigo-50 flex items-center justify-center text-indigo-500">
+      {icon}
+    </div>
+    <div>
+      <div className="text-[11px] text-gray-500">{title}</div>
+      <div className="text-lg font-semibold text-gray-800">{value}</div>
+    </div>
   </div>
 );
 

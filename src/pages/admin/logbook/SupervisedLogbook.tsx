@@ -46,6 +46,7 @@ const SupervisedLogbook: React.FC = () => {
   const [approvingId, setApprovingId] = useState<string | null>(null);
   const [studentName, setStudentName] = useState<string>('');
   const [studentEmail, setStudentEmail] = useState<string>('');
+  const [studentMembership, setStudentMembership] = useState<string>('');
   const [levelLabel, setLevelLabel] = useState<string>('Level 1');
   const [totalWeeks, setTotalWeeks] = useState<number>(52);
   const [weeksWithEntries, setWeeksWithEntries] = useState<Record<number, boolean>>({});
@@ -94,8 +95,10 @@ const SupervisedLogbook: React.FC = () => {
       // try to extract basic student info and level if present on response
       const anyEntry = (payload.entries || [])[0] as any;
       if (anyEntry && anyEntry.member) {
-        setStudentName(anyEntry.member.name || anyEntry.member.email || 'Student');
-        setStudentEmail(anyEntry.member.email || '');
+        const m = anyEntry.member;
+        setStudentName(m.name || `${m.title || ''} ${m.surname || ''} ${m.firstname || ''}`.trim() || m.email || '');
+        setStudentEmail(m.email || '');
+        setStudentMembership(m.membership_no || m.membership_id || m.member_id || '');
       }
       if ((payload as any).logbook && (payload as any).logbook.stage) {
         setLevelLabel(`Level ${(payload as any).logbook.stage}`);
@@ -151,10 +154,13 @@ const SupervisedLogbook: React.FC = () => {
           </div>
 
           <div className="bg-white border border-gray-200 rounded-xl p-6">
-            <h3 className="text-base font-semibold text-gray-800 mb-2">Student</h3>
+            <h3 className="text-base font-semibold text-gray-800 mb-2">Student Details</h3>
             <div className="text-sm font-medium text-gray-900 truncate mb-1">{studentName || 'Student'}</div>
-            {studentEmail && (
-              <div className="text-xs text-gray-600 break-all">{studentEmail}</div>
+            {(studentMembership || studentEmail) && (
+              <div className="text-xs text-gray-600 break-all">
+                {studentMembership && <span className="mr-2">{studentMembership}</span>}
+                {studentEmail}
+              </div>
             )}
           </div>
 

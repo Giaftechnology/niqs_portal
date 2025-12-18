@@ -49,8 +49,8 @@ const AdminLogin: React.FC = () => {
         </div>
       </div>
       <div className="flex-1 flex items-center justify-center px-4 py-10 lg:px-8">
-        <div className="w-full max-w-md">
-          <div className="bg-white/95 backdrop-blur rounded-2xl shadow-xl border border-slate-100 px-6 py-8 sm:px-8 sm:py-10">
+        <div className="w-full max-w-lg">
+          <div className="bg-white/95 backdrop-blur rounded-2xl shadow-xl border border-slate-100 px-8 py-10 sm:px-10 sm:py-12">
             <div className="mb-6 text-center">
               <h2 className="text-xl font-semibold text-slate-900">NIQS PORTAL</h2>
               <p className="mt-1 text-xs text-slate-500">Use your admin email and password to access the console.</p>
@@ -93,7 +93,14 @@ const AdminLogin: React.FC = () => {
               </button>
             </form>
             <div className="text-xs text-slate-500 mt-2">
-              Don't have an account? <a href="#" className="text-indigo-600 hover:underline">Register</a>
+              Don't have an account?{' '}
+              <button
+                type="button"
+                onClick={() => navigate('/admin/register')}
+                className="text-indigo-600 hover:underline"
+              >
+                Register
+              </button>
             </div>
             <div className="text-xs text-slate-500 mt-2">
               Forgot password? <a href="#" className="text-indigo-600 hover:underline">Reset Password</a>

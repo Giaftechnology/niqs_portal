@@ -24,7 +24,7 @@ const GlobalAlerts: React.FC = () => {
       open={!!alert}
       title={alert?.title || 'Action Completed'}
       onClose={() => setAlert(null)}
-      panelClassName="z-[9999]"
+      panelClassName="z-[9999] w-[90vw] max-w-xl sm:max-w-2xl"
     >
       {alert?.message}
     </Modal>
