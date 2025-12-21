@@ -190,6 +190,9 @@ const AdminLayout: React.FC = () => {
                 <NavLink to="/admin/logbook/accessors" className={navItemClass as any}>
                   <ShieldCheck size={18} /> Accessors
                 </NavLink>
+                <NavLink to="/admin/logbook/assessor-assignments" className={navItemClass as any}>
+                  <ShieldCheck size={18} /> Assessor Assignments
+                </NavLink>
                 <NavLink to="/admin/logbook/diet-management" className={navItemClass as any}>
                   <UtensilsCrossed size={18} /> Diet Management
                 </NavLink>

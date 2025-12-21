@@ -5,6 +5,7 @@ import Modal from '../../components/Modal';
 import StatusPill from '../../components/StatusPill';
 import { apiFetch } from '../../utils/api';
 import { AdminStore } from '../../utils/adminStore';
+import ReassignAccessorModal from './DietDetail.ReassignAccessorModal';
 
 const AdminDietDetail: React.FC = () => {
   const { id } = useParams();
@@ -27,6 +28,8 @@ const AdminDietDetail: React.FC = () => {
   const [reopenLoading, setReopenLoading] = useState(false);
   const [closeLoading, setCloseLoading] = useState(false);
   const [applicationSort, setApplicationSort] = useState<'name' | 'status'>('name');
+  const [reassign, setReassign] = useState<{open:boolean; logbookId?:string}>({open:false});
+  const [reassignQ, setReassignQ] = useState('');
 
   useEffect(() => {
     let ignore = false;
@@ -101,6 +104,23 @@ const AdminDietDetail: React.FC = () => {
     });
     return map;
   }, [assessorRows]);
+
+  const assessorStatsById = useMemo(() => {
+    const stats: Record<string, { assigned: number; accessed: number; pending: number }> = {};
+    logbooks.forEach((lb: any) => {
+      const id = lb && lb.assessor_id ? String(lb.assessor_id) : '';
+      if (!id) return;
+      if (!stats[id]) stats[id] = { assigned: 0, accessed: 0, pending: 0 };
+      stats[id].assigned += 1;
+      const status = String(lb.status || '').toLowerCase();
+      if (status === 'graded') stats[id].accessed += 1;
+    });
+    Object.keys(stats).forEach((id) => {
+      const s = stats[id];
+      s.pending = Math.max(0, s.assigned - s.accessed);
+    });
+    return stats;
+  }, [logbooks]);
 
   const [supervisorNameById, setSupervisorNameById] = useState<Record<string, string>>({});
 
@@ -323,7 +343,7 @@ const AdminDietDetail: React.FC = () => {
               <span>{reopenLoading ? 'Reopening…' : 'Reopen Diet'}</span>
             </button>
           )}
-          <button onClick={()=>setAssignOpen(true)} className="px-3 py-1.5 text-sm bg-indigo-600 text-white rounded-md">Start Assessment / Assign Accessor</button>
+          <button onClick={()=>setAssignOpen(true)} className="px-3 py-1.5 text-sm bg-indigo-600 text-white rounded-md">Assign Accessor</button>
         </div>
       </div>
 
@@ -346,14 +366,20 @@ const AdminDietDetail: React.FC = () => {
               <option value="email">Sort: Email</option>
             </select>
             <button
-              onClick={autoAssignLogbooks}
+              onClick={() => setConfirm({
+                open: true,
+                title: 'Start Assessment?',
+                message: 'Are you sure you want to start assessment for this diet? This will auto-assign logbooks to the selected accessor(s).',
+                onConfirm: () => { void autoAssignLogbooks(); },
+                confirmText: 'Yes, Start Assessment',
+              })}
               className="px-2 py-1 border rounded text-xs disabled:opacity-60 flex items-center gap-1"
               disabled={autoAssignLoading}
             >
               {autoAssignLoading && (
                 <span className="inline-block w-3 h-3 border-2 border-gray-500 border-t-transparent rounded-full animate-spin" />
               )}
-              <span>{autoAssignLoading ? 'Assigning…' : 'Auto-Assign Logbooks'}</span>
+              <span>{autoAssignLoading ? 'Starting…' : 'Start Assessment'}</span>
             </button>
           </div>
         </div>
@@ -364,6 +390,9 @@ const AdminDietDetail: React.FC = () => {
                 <th className="p-2">Membership No</th>
                 <th className="p-2">Name</th>
                 <th className="p-2">Email</th>
+                <th className="p-2">Assigned</th>
+                <th className="p-2">Accessed</th>
+                <th className="p-2">Pending</th>
                 <th className="p-2">Action</th>
               </tr>
             </thead>
@@ -380,6 +409,17 @@ const AdminDietDetail: React.FC = () => {
                     <td className="p-2">{a.member?.membership_no || '-'}</td>
                     <td className="p-2">{`${a.member?.title || ''} ${a.member?.surname || ''} ${a.member?.firstname || ''}`.trim() || '-'}</td>
                     <td className="p-2">{a.member?.email || '-'}</td>
+                    {(() => {
+                      const accessorId = String(a.assessor_id || a.id || '');
+                      const s = accessorId ? assessorStatsById[accessorId] : undefined;
+                      return (
+                        <>
+                          <td className="p-2">{s?.assigned ?? 0}</td>
+                          <td className="p-2">{s?.accessed ?? 0}</td>
+                          <td className="p-2">{s?.pending ?? 0}</td>
+                        </>
+                      );
+                    })()}
                     <td className="p-2">
                       <button
                         className="px-2 py-1 text-xs border rounded"
@@ -422,6 +462,7 @@ const AdminDietDetail: React.FC = () => {
                 <th className="p-2">Status</th>
                 <th className="p-2">Supervisor</th>
                 <th className="p-2">Assessor</th>
+                <th className="p-2">Action</th>
               </tr>
             </thead>
             <tbody>
@@ -447,6 +488,47 @@ const AdminDietDetail: React.FC = () => {
                       </td>
                       <td className="p-2">{lb.supervisor_id ? (supervisorNameById[String(lb.supervisor_id)] || '-') : '-'}</td>
                       <td className="p-2">{lb.assessor_id ? (assessorNameById[String(lb.assessor_id)] || '-') : '-'}</td>
+                      <td className="p-2">
+                        <div className="flex flex-wrap gap-1">
+                          <button
+                            type="button"
+                            disabled={!lb.assessor_id}
+                            onClick={() => {
+                              if (!lb.id) return;
+                              setConfirm({
+                                open: true,
+                                title: 'Remove Assessor?',
+                                message: 'This will remove the accessor from this logbook. Continue?',
+                                onConfirm: async () => {
+                                  try {
+                                    await apiFetch(`/api/logbook/${encodeURIComponent(String(lb.id))}/remove-assessor`, { method: 'POST' });
+                                    setVersion((v) => v + 1);
+                                  } catch (e: any) {
+                                    setInfo({ open: true, title: 'Error', message: e?.message || 'Failed to remove assessor.' });
+                                  } finally {
+                                    setConfirm({ open: false, title: '' });
+                                  }
+                                },
+                                confirmText: 'Yes, Remove',
+                              });
+                            }}
+                            className="px-2 py-1 text-[11px] border rounded disabled:opacity-50"
+                          >
+                            Remove
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => {
+                              if (!lb.id) return;
+                              setReassign({ open: true, logbookId: String(lb.id) });
+                              setReassignQ('');
+                            }}
+                            className="px-2 py-1 text-[11px] border rounded"
+                          >
+                            Reassign
+                          </button>
+                        </div>
+                      </td>
                     </tr>
                   );
                 })}
@@ -520,6 +602,17 @@ const AdminDietDetail: React.FC = () => {
         onAssigned={(msg)=>{
           setInfo({ open:true, title:'Accessor Assigned', message: msg || 'Accessor assigned to this diet.' });
           setVersion(v=>v+1);
+        }}
+      />
+      <ReassignAccessorModal
+        open={reassign.open}
+        logbookId={reassign.logbookId}
+        q={reassignQ}
+        setQ={setReassignQ}
+        onClose={() => { setReassign({ open: false }); setReassignQ(''); }}
+        onReassigned={(msg: string | undefined) => {
+          setInfo({ open: true, title: 'Accessor Reassigned', message: msg || 'Accessor reassigned for this logbook.' });
+          setVersion((v) => v + 1);
         }}
       />
       <AssignSupervisorModal open={supPick.open} studentEmail={supPick.studentEmail} q={supQ} setQ={setSupQ} onClose={()=>{ setSupPick({open:false}); setSupQ(''); }} />

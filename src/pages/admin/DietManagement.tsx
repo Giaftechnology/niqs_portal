@@ -239,7 +239,7 @@ const AdminDietManagement: React.FC = () => {
         onConfirm={()=>{ if (!extSubmitting) void submitExtend(); }}
         confirmText={extSubmitting ? 'Extending…' : 'Extend'}
         closeText={extSubmitting ? 'Close' : 'Cancel'}
-        panelClassName="max-w-md"
+        panelClassName="max-w-3xl w-[90vw]"
         bodyClassName="!text-inherit"
       >
         <div className="grid grid-cols-1 gap-3">

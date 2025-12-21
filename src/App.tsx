@@ -79,6 +79,8 @@ import AdminLogbooks from './pages/admin/logbook/Logbooks';
 import SupervisorRequests from './pages/admin/logbook/SupervisorRequests';
 import SupervisedLogbook from './pages/admin/logbook/SupervisedLogbook';
 import AssessorLogbooks from './pages/admin/logbook/AssessorLogbooks';
+import AssessorLogbookDetail from './pages/admin/logbook/AssessorLogbookDetail';
+import AssessorAssignments from './pages/admin/logbook/AssessorAssignments';
 
 const App: React.FC = () => {
   return (
@@ -147,6 +149,7 @@ const App: React.FC = () => {
             {/* Logbook group */}
             <Route path="logbook/supervisors" element={<AdminSupervisors />} />
             <Route path="logbook/accessors" element={<AdminAccessors />} />
+            <Route path="logbook/assessor-assignments" element={<AssessorAssignments />} />
             <Route path="logbook/diet-management" element={<AdminDietManagement />} />
             <Route path="logbook/diet-management/:id" element={<AdminDietDetail />} />
             <Route path="logbook/diet-management/:id/submissions/:sid" element={<SubmissionDetail />} />
@@ -155,6 +158,7 @@ const App: React.FC = () => {
             <Route path="logbook/supervisor-requests" element={<SupervisorRequests />} />
             <Route path="logbook/supervised/:logbookId" element={<SupervisedLogbook />} />
             <Route path="logbook/assessors/:assessorId/logbooks" element={<AssessorLogbooks />} />
+            <Route path="logbook/assessor-view/:logbookId" element={<AssessorLogbookDetail />} />
             <Route path="settings" element={<AdminSettings />} />
             <Route path="databank" element={<AdminDashboard />} />
           </Route>
