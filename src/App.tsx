@@ -81,6 +81,7 @@ import SupervisedLogbook from './pages/admin/logbook/SupervisedLogbook';
 import AssessorLogbooks from './pages/admin/logbook/AssessorLogbooks';
 import AssessorLogbookDetail from './pages/admin/logbook/AssessorLogbookDetail';
 import AssessorAssignments from './pages/admin/logbook/AssessorAssignments';
+import AssessorDietLogbooks from './pages/admin/logbook/AssessorDietLogbooks';
 
 const App: React.FC = () => {
   return (
@@ -150,6 +151,7 @@ const App: React.FC = () => {
             <Route path="logbook/supervisors" element={<AdminSupervisors />} />
             <Route path="logbook/accessors" element={<AdminAccessors />} />
             <Route path="logbook/assessor-assignments" element={<AssessorAssignments />} />
+            <Route path="logbook/assessor-assignments/:dietId" element={<AssessorDietLogbooks />} />
             <Route path="logbook/diet-management" element={<AdminDietManagement />} />
             <Route path="logbook/diet-management/:id" element={<AdminDietDetail />} />
             <Route path="logbook/diet-management/:id/submissions/:sid" element={<SubmissionDetail />} />

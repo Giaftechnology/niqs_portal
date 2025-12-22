@@ -38,39 +38,46 @@ const AdminDietDetail: React.FC = () => {
       setDietLoading(true); setDietError(null);
       try {
         const res = await apiFetch<any>(`/api/logbook-diets/${id}`);
-        const d = res?.data ? (Array.isArray(res.data) ? res.data[0] : res.data) : res;
-        if (!ignore) setDietData(d || null);
+        // API may return either the diet object directly or a wrapper with { diet, logbooks, applications, assessors }
+        const payload = res?.data ? (Array.isArray(res.data) ? res.data[0] : res.data) : res;
+        const core = payload?.diet ? payload.diet : payload;
+        const merged = core
+          ? {
+              ...core,
+              // attach collections if present on the wrapper so the rest of the component can read diet.logbooks etc.
+              // Prefer the detailed collections on the diet object; top-level payload.assessors is only a summary.
+              logbooks: core.logbooks ?? payload?.logbooks,
+              applications: core.applications ?? payload?.applications,
+              assessors: core.assessors ?? payload?.assessors,
+            }
+          : null;
+        if (!ignore) setDietData(merged || null);
       } catch (e: any) {
         if (!ignore) setDietError(e?.message || 'Failed to load diet');
       } finally {
         if (!ignore) setDietLoading(false);
       }
     };
-    load();
+    void load();
     return () => { ignore = true; };
   }, [id, version]);
 
   const autoAssignLogbooks = async () => {
     if (!diet?.id) return;
-    const first = assessorRows[0];
-    if (!first || !first.id) {
-      setInfo({ open:true, title:'Auto-Assign Logbooks', message:'No assessor is assigned to this diet yet.' });
-      return;
-    }
     try {
       setAutoAssignLoading(true);
-      const res = await apiFetch<any>('/api/assessors/auto-assign-logbooks', {
-        method: 'POST',
-        body: { assessor_id: first.id, diet_id: diet.id },
-      });
+      const res = await apiFetch<any>(
+        `/api/logbook-diets/${encodeURIComponent(String(diet.id))}/start/assessment`,
+        { method: 'GET' },
+      );
       const msg =
         (typeof res?.message === 'string' && res.message) ||
         (typeof res?.data?.message === 'string' && res.data.message) ||
-        'Logbooks auto-assigned to assessor.';
-      setInfo({ open:true, title:'Auto-Assign Logbooks', message: msg });
+        'Assessment started for this diet.';
+      setInfo({ open:true, title:'Start Assessment', message: msg });
       setVersion(v=>v+1);
     } catch (e: any) {
-      setInfo({ open:true, title:'Auto-Assign Logbooks', message: e?.message || 'Failed to auto-assign logbooks.' });
+      setInfo({ open:true, title:'Start Assessment', message: e?.message || 'Failed to start assessment for this diet.' });
     } finally {
       setAutoAssignLoading(false);
     }
@@ -106,14 +113,15 @@ const AdminDietDetail: React.FC = () => {
   }, [assessorRows]);
 
   const assessorStatsById = useMemo(() => {
+    // Key stats by accessor's member_id (same identifier used in logbooks.assessor_id)
     const stats: Record<string, { assigned: number; accessed: number; pending: number }> = {};
     logbooks.forEach((lb: any) => {
-      const id = lb && lb.assessor_id ? String(lb.assessor_id) : '';
-      if (!id) return;
-      if (!stats[id]) stats[id] = { assigned: 0, accessed: 0, pending: 0 };
-      stats[id].assigned += 1;
+      const memberId = lb && lb.assessor_id ? String(lb.assessor_id) : '';
+      if (!memberId) return;
+      if (!stats[memberId]) stats[memberId] = { assigned: 0, accessed: 0, pending: 0 };
+      stats[memberId].assigned += 1;
       const status = String(lb.status || '').toLowerCase();
-      if (status === 'graded') stats[id].accessed += 1;
+      if (status === 'graded') stats[memberId].accessed += 1;
     });
     Object.keys(stats).forEach((id) => {
       const s = stats[id];
@@ -244,7 +252,9 @@ const AdminDietDetail: React.FC = () => {
     </div>
   );
 
-  const isActive = Boolean((diet as any)?.is_active) || String((diet as any)?.status || '').toLowerCase() === 'active';
+  const status = String((diet as any)?.status || '').toLowerCase();
+  const isAssessmentOngoing = status === 'assessment_ongoing';
+  const isActive = status === 'active' || isAssessmentOngoing;
 
   const closeDiet = () => {
     setConfirm({
@@ -272,11 +282,32 @@ const AdminDietDetail: React.FC = () => {
     });
   };
 
+  const closeAssessmentDiet = async () => {
+    if (!diet?.id) return;
+    setAutoAssignLoading(true);
+    try {
+      const res = await apiFetch<any>(
+        `/api/logbook-diets/${encodeURIComponent(String(diet.id))}/close`,
+        { method: 'GET' },
+      );
+      const msg =
+        (typeof res?.message === 'string' && res.message) ||
+        (typeof res?.data?.message === 'string' && res.data.message) ||
+        'Diet closed.';
+      setInfo({ open: true, title: 'Diet Closed', message: msg });
+      setVersion((v) => v + 1);
+    } catch (e: any) {
+      setInfo({ open: true, title: 'Error', message: e?.message || 'Failed to close diet.' });
+    } finally {
+      setAutoAssignLoading(false);
+    }
+  };
+
   const performReopenDiet = async () => {
     if (!id) return;
     setReopenLoading(true);
     try {
-      const res = await apiFetch<any>(`/api/logbook-diets/${encodeURIComponent(String(id))}/open`, { method: 'POST' });
+      const res = await apiFetch<any>(`/api/logbook-diets/${encodeURIComponent(String(id))}/open`, { method: 'GET' });
       const msg =
         (typeof res?.message === 'string' && res.message) ||
         (typeof res?.data?.message === 'string' && res.data.message) ||
@@ -365,22 +396,50 @@ const AdminDietDetail: React.FC = () => {
               <option value="name">Sort: Name</option>
               <option value="email">Sort: Email</option>
             </select>
-            <button
-              onClick={() => setConfirm({
-                open: true,
-                title: 'Start Assessment?',
-                message: 'Are you sure you want to start assessment for this diet? This will auto-assign logbooks to the selected accessor(s).',
-                onConfirm: () => { void autoAssignLogbooks(); },
-                confirmText: 'Yes, Start Assessment',
-              })}
-              className="px-2 py-1 border rounded text-xs disabled:opacity-60 flex items-center gap-1"
-              disabled={autoAssignLoading}
-            >
-              {autoAssignLoading && (
-                <span className="inline-block w-3 h-3 border-2 border-gray-500 border-t-transparent rounded-full animate-spin" />
-              )}
-              <span>{autoAssignLoading ? 'Starting…' : 'Start Assessment'}</span>
-            </button>
+            {isAssessmentOngoing ? (
+              <button
+                onClick={() =>
+                  setConfirm({
+                    open: true,
+                    title: 'Close Diet?',
+                    message: 'This will close this diet and end the ongoing assessment. Continue?',
+                    onConfirm: () => {
+                      void closeAssessmentDiet();
+                    },
+                    confirmText: 'Yes, Close Diet',
+                  })
+                }
+                className="px-2 py-1 text-xs rounded bg-red-600 text-white disabled:opacity-60 flex items-center gap-1"
+                disabled={autoAssignLoading}
+              >
+                {autoAssignLoading && (
+                  <span className="inline-block w-3 h-3 border-2 border-gray-100 border-t-transparent rounded-full animate-spin" />
+                )}
+                <span>{autoAssignLoading ? 'Closing…' : 'Close Diet'}</span>
+              </button>
+            ) : (
+              <button
+                onClick={() =>
+                  setConfirm({
+                    open: true,
+                    title: 'Start Assessment?',
+                    message:
+                      'Are you sure you want to start assessment for this diet? This will auto-assign logbooks to the selected accessor(s).',
+                    onConfirm: () => {
+                      void autoAssignLogbooks();
+                    },
+                    confirmText: 'Yes, Start Assessment',
+                  })
+                }
+                className="px-2 py-1 text-xs rounded bg-indigo-600 text-white disabled:opacity-60 flex items-center gap-1"
+                disabled={autoAssignLoading}
+              >
+                {autoAssignLoading && (
+                  <span className="inline-block w-3 h-3 border-2 border-gray-500 border-t-transparent rounded-full animate-spin" />
+                )}
+                <span>{autoAssignLoading ? 'Starting…' : 'Start Assessment'}</span>
+              </button>
+            )}
           </div>
         </div>
         <div className="p-3 overflow-x-auto">
@@ -410,8 +469,9 @@ const AdminDietDetail: React.FC = () => {
                     <td className="p-2">{`${a.member?.title || ''} ${a.member?.surname || ''} ${a.member?.firstname || ''}`.trim() || '-'}</td>
                     <td className="p-2">{a.member?.email || '-'}</td>
                     {(() => {
-                      const accessorId = String(a.assessor_id || a.id || '');
-                      const s = accessorId ? assessorStatsById[accessorId] : undefined;
+                      // Use the member's id (or member_id) to line up with logbooks.assessor_id
+                      const memberId = String(a.member?.id || a.member_id || '');
+                      const s = memberId ? assessorStatsById[memberId] : undefined;
                       return (
                         <>
                           <td className="p-2">{s?.assigned ?? 0}</td>
