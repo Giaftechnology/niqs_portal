@@ -370,7 +370,7 @@ const AssessorLogbookDetail: React.FC = () => {
                 disabled={assessing}
                 className="px-4 py-2 rounded-md bg-indigo-600 text-white text-sm disabled:opacity-60"
               >
-                {assessing ? 'Grading5' : 'Grade Logbook'}
+                {assessing ? 'Grading…' : 'Grade Logbook'}
               </button>
             </div>
           </div>
@@ -382,7 +382,7 @@ const AssessorLogbookDetail: React.FC = () => {
         title="Confirm Logbook Grading"
         onClose={() => setConfirmOpen(false)}
         onConfirm={() => void submitAssessment()}
-        confirmText={assessing ? 'Grading5' : 'Yes, Grade Logbook'}
+        confirmText={assessing ? 'Grading…' : 'Yes, Grade Logbook'}
       >
         <div className="text-sm text-gray-700">
           Are you sure you want to grade this logbook? This action will mark it as assessed.
