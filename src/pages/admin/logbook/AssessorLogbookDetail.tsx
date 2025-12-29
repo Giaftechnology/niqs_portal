@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useState, useCallback } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import { BookOpen } from 'lucide-react';
 import { apiFetch } from '../../../utils/api';
@@ -50,6 +50,7 @@ const AssessorLogbookDetail: React.FC = () => {
   const [levelLabel, setLevelLabel] = useState<string>('Level 1');
   const [totalWeeks, setTotalWeeks] = useState<number>(52);
   const [weeksWithEntries, setWeeksWithEntries] = useState<Record<number, boolean>>({});
+  const [logbookStatus, setLogbookStatus] = useState<string | null>(null);
 
   // assessment state
   const [details, setDetails] = useState<number | ''>('');
@@ -63,9 +64,15 @@ const AssessorLogbookDetail: React.FC = () => {
   const [assessError, setAssessError] = useState<string | null>(null);
   const [confirmOpen, setConfirmOpen] = useState(false);
 
+  const isAlreadyGraded = useMemo(() => {
+    const s = String(logbookStatus || '').trim().toLowerCase();
+    // Treat these statuses as "already graded"
+    return s === 'graded' || s === 'passed' || s === 'assessed' || s === 'completed';
+  }, [logbookStatus]);
+
   const weeks = useMemo(() => WEEKS.slice(0, totalWeeks), [totalWeeks]);
 
-  const loadWeek = async (week: number) => {
+  const loadWeek = useCallback(async (week: number) => {
     if (!logbookId) return;
     setLoading(true);
     setError(null);
@@ -109,20 +116,53 @@ const AssessorLogbookDetail: React.FC = () => {
         setStudentEmail(m.email || '');
         setStudentMembership(m.membership_no || m.membership_id || m.member_id || '');
       }
-      if ((payload as any).logbook && (payload as any).logbook.stage) {
-        setLevelLabel(`Level ${(payload as any).logbook.stage}`);
+      if ((payload as any).logbook) {
+        const lb = (payload as any).logbook;
+        if (lb.stage) {
+          setLevelLabel(`Level ${lb.stage}`);
+        }
+        if (lb.status) {
+          setLogbookStatus(String(lb.status));
+        }
       }
     } catch (e: any) {
       setError(e?.message || 'Failed to load entries for this week');
     } finally {
       setLoading(false);
     }
-  };
+  }, [logbookId]);
 
   useEffect(() => {
     if (!logbookId) return;
     void loadWeek(selectedWeek);
-  }, [logbookId, selectedWeek]);
+  }, [logbookId, selectedWeek, loadWeek]);
+
+  // On initial load, fetch the logbook object directly so we know its overall status
+  useEffect(() => {
+    if (!logbookId) return;
+    let ignore = false;
+    const loadStatus = async () => {
+      try {
+        const res = await apiFetch<any>(`/api/logbook/${encodeURIComponent(logbookId)}`);
+        // Normalise a few common API response shapes
+        const root = res?.data ?? res;
+        const data = (root && (root.data ?? root)) || root;
+        const status =
+          (data && (data.status || data.logbook_status)) ||
+          (data && (data.logbook?.status || data.logbook?.logbook_status)) ||
+          null;
+        if (!ignore && status) {
+          setLogbookStatus(String(status));
+        }
+      } catch {
+        // ignore status errors; grading UI will still function, just without pre-detected status
+      }
+    };
+    void loadStatus();
+    return () => {
+      ignore = true;
+    };
+  }, [logbookId]);
 
   const validateAssessment = (): string | null => {
     const nums = [details, practicality, correctness, creativity, presentation];
@@ -143,7 +183,7 @@ const AssessorLogbookDetail: React.FC = () => {
     setAssessing(true);
     setAssessError(null);
     try {
-      await apiFetch(`/api/logbook/${encodeURIComponent(logbookId)}/assess`, {
+      const res = await apiFetch<any>(`/api/logbook/${encodeURIComponent(logbookId)}/assess`, {
         method: 'POST',
         body: {
           details: Number(details),
@@ -155,9 +195,18 @@ const AssessorLogbookDetail: React.FC = () => {
           result,
         },
       });
+      const msg =
+        (typeof res?.message === 'string' && res.message) ||
+        (typeof res?.data?.message === 'string' && res.data.message) ||
+        'Logbook graded successfully.';
+      const nextStatus =
+        (res && typeof (res as any).status === 'string' && (res as any).status) ||
+        (res && (res as any).data && typeof (res as any).data.status === 'string' && (res as any).data.status) ||
+        'graded';
+      setLogbookStatus(nextStatus);
       try {
         const ev = new CustomEvent('global-alert', {
-          detail: { title: 'Logbook Assessed', message: 'Logbook graded successfully.' },
+          detail: { title: 'Logbook Assessed', message: msg },
         });
         window.dispatchEvent(ev);
         document.dispatchEvent(ev);
@@ -288,6 +337,13 @@ const AssessorLogbookDetail: React.FC = () => {
             <div className="flex items-center justify-between">
               <h2 className="text-sm font-semibold text-gray-800">Grade Logbook</h2>
             </div>
+            {isAlreadyGraded ? (
+              <div className="p-3 rounded-md bg-emerald-50 border border-emerald-200 text-sm text-emerald-800">
+                This logbook has already been graded. You can review the entries and existing grade, but further changes
+                are disabled.
+              </div>
+            ) : (
+            <>
             <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 text-sm">
               <div>
                 <label className="block text-xs text-gray-600 mb-1">Details</label>
@@ -373,6 +429,8 @@ const AssessorLogbookDetail: React.FC = () => {
                 {assessing ? 'Grading…' : 'Grade Logbook'}
               </button>
             </div>
+            </>
+            )}
           </div>
         </div>
       </div>
